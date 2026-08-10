@@ -39,20 +39,31 @@ function createWindow() {
   });
 
   // Handle Screen Sharing Picker
+  let screenPickerCallback = null;
+
   session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    desktopCapturer.getSources({ types: ['screen', 'window'] }).then((sources) => {
-      const template = sources.map(source => ({
-        label: source.name,
-        click: () => {
-          callback({ video: source, audio: 'loopback' });
-        }
+    desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 200, height: 200 } }).then((sources) => {
+      screenPickerCallback = callback;
+      
+      const sourcesData = sources.map(source => ({
+        id: source.id,
+        name: source.name,
+        thumbnailUrl: source.thumbnail.toDataURL()
       }));
-      
-      template.push({ type: 'separator' });
-      template.push({ label: 'Cancelar', click: () => callback() });
-      
-      const menu = Menu.buildFromTemplate(template);
-      menu.popup({ window: mainWindow });
+
+      mainWindow.webContents.send('show-screen-picker', sourcesData);
+
+      ipcMain.removeAllListeners('screen-picker-result');
+      ipcMain.once('screen-picker-result', (event, sourceId) => {
+        if (screenPickerCallback) {
+          if (sourceId) {
+            screenPickerCallback({ video: { id: sourceId, name: 'Screen' }, audio: 'loopback' });
+          } else {
+            screenPickerCallback(); // Cancelado
+          }
+          screenPickerCallback = null;
+        }
+      });
     }).catch(err => {
       console.error('Erro ao obter telas:', err);
       callback();
