@@ -12,12 +12,14 @@ echo automatizar a criacao, e voce faz o upload com 1 clique!
 echo ====================================================
 echo.
 echo Qual o tamanho dessa atualizacao?
-echo [1] Pequena (Patch)  - Ex: arrumei um bug pequeno (v1.0.0 -^> v1.0.1)
-echo [2] Media   (Minor)  - Ex: adicionei uma tela nova (v1.0.0 -^> v1.1.0)
-echo [3] Grande  (Major)  - Ex: recriei o app do zero   (v1.0.0 -^> v2.0.0)
+echo [0] Apenas Compilar - Nao mudar a versao (Manter a atual)
+echo [1] Pequena (Patch) - Ex: arrumei um bug pequeno (v1.0.0 -^> v1.0.1)
+echo [2] Media   (Minor) - Ex: adicionei uma tela nova (v1.0.0 -^> v1.1.0)
+echo [3] Grande  (Major) - Ex: recriei o app do zero   (v1.0.0 -^> v2.0.0)
 echo.
-set /p tipo_up="Digite 1, 2 ou 3 e aperte ENTER: "
+set /p tipo_up="Digite 0, 1, 2 ou 3 e aperte ENTER: "
 
+if "%tipo_up%"=="0" set npm_cmd=none
 if "%tipo_up%"=="1" set npm_cmd=patch
 if "%tipo_up%"=="2" set npm_cmd=minor
 if "%tipo_up%"=="3" set npm_cmd=major
@@ -30,9 +32,13 @@ if "%npm_cmd%"=="" (
 
 echo.
 echo ====================================================
-echo 1/2: Aumentando a versao do aplicativo...
+echo 1/2: Ajustando a versao do aplicativo...
 echo ====================================================
-call npm --no-git-tag-version version %npm_cmd%
+if not "%npm_cmd%"=="none" (
+    call npm --no-git-tag-version version %npm_cmd%
+) else (
+    echo A versao atual foi mantida intacta.
+)
 
 echo.
 echo ====================================================
