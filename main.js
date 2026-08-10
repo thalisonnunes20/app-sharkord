@@ -23,7 +23,9 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     // Check for updates once the window is shown
-    autoUpdater.checkForUpdatesAndNotify();
+    autoUpdater.checkForUpdatesAndNotify().catch(err => {
+      console.log('Update check ignored/failed (likely dev mode):', err.message);
+    });
   });
 
   // Handle updates downloaded
@@ -36,6 +38,14 @@ function createWindow() {
     autoUpdater.quitAndInstall();
   });
 
+  // Handle manual check command from UI
+  ipcMain.on('manual-check-update', () => {
+    autoUpdater.checkForUpdatesAndNotify().catch(err => {
+      console.error('Erro na busca manual:', err);
+      if (mainWindow) mainWindow.webContents.send('update-status', 'Erro na busca');
+    });
+  });
+
   // Força o Electron a ignorar eventos que impedem o descarregamento da página (como streams ativos)
   mainWindow.webContents.on('will-prevent-unload', (event) => {
     event.preventDefault();
@@ -45,6 +55,17 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Lida com falhas de carregamento (URL inválida, servidor offline, etc)
+  mainWindow.webContents.on('did-fail-load', (event, errorCode, errorDescription, validatedURL, isMainFrame) => {
+    if (isMainFrame && errorCode !== -3) { // Ignora ABORTED (-3)
+      store.delete('sharkordServerUrl');
+      mainWindow.loadFile('index.html');
+      mainWindow.webContents.once('did-finish-load', () => {
+        mainWindow.webContents.send('connection-error', errorDescription);
+      });
+    }
   });
 
   // Handle WebRTC Permissions for Sharkord (Camera, Microphone, Screen Sharing)
@@ -145,8 +166,14 @@ ipcMain.handle('get-version', () => {
 
 // Setup autoUpdater logging
 autoUpdater.on('update-available', () => {
-  console.log('Update available.');
+  if (mainWindow) mainWindow.webContents.send('update-status', 'Baixando...');
+});
+autoUpdater.on('update-not-available', () => {
+  if (mainWindow) mainWindow.webContents.send('update-status', 'Sem atualizações');
+});
+autoUpdater.on('error', () => {
+  if (mainWindow) mainWindow.webContents.send('update-status', 'Erro na busca');
 });
 autoUpdater.on('update-downloaded', () => {
-  console.log('Update downloaded. It will be installed on restart.');
+  if (mainWindow) mainWindow.webContents.send('update-status', 'Pronto!');
 });

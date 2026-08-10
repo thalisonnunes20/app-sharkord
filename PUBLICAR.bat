@@ -36,6 +36,12 @@ call npm --no-git-tag-version version %npm_cmd%
 
 echo.
 echo ====================================================
+echo Limpando a pasta de compilacao antiga...
+echo ====================================================
+if exist "dist" rmdir /s /q "dist"
+
+echo.
+echo ====================================================
 echo 2/2: Compilando o Instalador Oficial (Aguarde alguns minutos)...
 echo ====================================================
 call npm run build

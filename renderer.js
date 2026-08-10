@@ -28,3 +28,16 @@ document.getElementById('setup-form').addEventListener('submit', (e) => {
     errorMessage.style.display = 'block';
   }
 });
+
+if (window.electronAPI && window.electronAPI.onConnectionError) {
+  window.electronAPI.onConnectionError((event, errorDesc) => {
+    const errorMessage = document.getElementById('error-message');
+    const submitBtn = document.querySelector('.submit-btn');
+    
+    errorMessage.innerText = 'Falha ao conectar ao servidor. Verifique a URL e tente novamente.';
+    errorMessage.style.display = 'block';
+    
+    submitBtn.innerText = 'Conectar';
+    submitBtn.disabled = false;
+  });
+}

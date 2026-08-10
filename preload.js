@@ -4,7 +4,10 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveServerUrl: (url) => ipcRenderer.send('save-server-url', url),
   getVersion: () => ipcRenderer.invoke('get-version'),
   onUpdateReady: (callback) => ipcRenderer.on('update-ready', callback),
-  installUpdate: () => ipcRenderer.send('install-update')
+  installUpdate: () => ipcRenderer.send('install-update'),
+  manualCheckUpdate: () => ipcRenderer.send('manual-check-update'),
+  onUpdateStatus: (callback) => ipcRenderer.on('update-status', callback),
+  onConnectionError: (callback) => ipcRenderer.on('connection-error', callback)
 });
 
 // Injeta lógica de atualização e botão flutuante na página web do Sharkord
@@ -16,12 +19,10 @@ window.addEventListener('DOMContentLoaded', async () => {
     versionEl.innerText = 'v' + v;
   }
 
-  // Se estivermos dentro do servidor Sharkord, injetamos o botão de Sair
-  if (window.location.protocol.startsWith('http')) {
-    // Inject custom Tailwind-like CSS for the modal
-    const style = document.createElement('style');
-    style.innerHTML = `
-      .sharkord-disconnect-btn {
+  // Inject custom Tailwind-like CSS for modals and buttons em TODAS as páginas
+  const style = document.createElement('style');
+  style.innerHTML = `
+    .sharkord-disconnect-btn {
         position: fixed; bottom: 80px; right: 0; z-index: 999999;
         padding: 10px 20px 10px 16px; background-color: #ef4444; color: #fff;
         border: none; border-radius: 12px 0 0 12px; cursor: pointer;
@@ -40,18 +41,19 @@ window.addEventListener('DOMContentLoaded', async () => {
         opacity: 1; 
       }
       .sharkord-update-btn {
-        position: fixed; top: 20px; right: 0; z-index: 999999;
+        position: fixed; bottom: 130px; right: 0; z-index: 999999;
         padding: 10px 20px 10px 16px; background-color: #23a559; color: #fff;
         border: none; border-radius: 12px 0 0 12px; cursor: pointer;
         font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
         font-weight: 600; box-shadow: -4px 4px 16px rgba(0,0,0,0.4);
-        opacity: 0.9; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+        opacity: 0.6; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
         transform: translateX(calc(100% - 28px));
         display: flex; align-items: center; gap: 12px;
       }
       .sharkord-update-btn::before {
-        content: "⭐";
-        font-size: 12px;
+        content: "⟳";
+        font-size: 14px;
+        font-weight: bold;
       }
       .sharkord-update-btn:hover { 
         transform: translateX(0); 
@@ -83,6 +85,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     `;
     document.head.appendChild(style);
 
+  // Se estivermos dentro do servidor Sharkord, injetamos o botão de Sair
+  if (window.location.protocol.startsWith('http')) {
     const btn = document.createElement('button');
     btn.className = 'sharkord-disconnect-btn';
     btn.innerText = 'Sair do Servidor';
@@ -131,21 +135,124 @@ window.addEventListener('DOMContentLoaded', async () => {
     document.body.appendChild(btn);
   }
 
-  // Escuta se há atualizações prontas
+  // Criação do botão manual de atualização visível (mesmo fora do servidor)
+  const updateBtn = document.createElement('button');
+  updateBtn.className = 'sharkord-update-btn';
+  updateBtn.innerText = 'Verificar Atualizações';
+  
+  // Status de update pronto
+  let isUpdateReady = false;
+  let updateModalOverlay = null;
+  let updateModalText = null;
+  let updateModalActionBtn = null;
+
+  updateBtn.addEventListener('click', () => {
+    // Cria o overlay do pop-up
+    updateModalOverlay = document.createElement('div');
+    updateModalOverlay.className = 'sharkord-modal-overlay';
+    
+    const modal = document.createElement('div');
+    modal.className = 'sharkord-modal-box';
+    
+    const title = document.createElement('h3');
+    title.className = 'sharkord-modal-title';
+    title.innerText = 'Central de Atualizações';
+    
+    updateModalText = document.createElement('p');
+    updateModalText.className = 'sharkord-modal-text';
+    
+    if (isUpdateReady) {
+      updateModalText.innerHTML = 'Uma nova atualização já foi baixada e está pronta.<br><br>O aplicativo será fechado para instalar a atualização agora.';
+    } else {
+      updateModalText.innerText = 'Deseja buscar por novas versões no servidor?';
+    }
+
+    const actions = document.createElement('div');
+    actions.className = 'sharkord-modal-actions';
+    
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
+    cancelBtn.innerText = 'Fechar';
+    cancelBtn.onclick = () => {
+      document.body.removeChild(updateModalOverlay);
+      updateModalOverlay = null;
+    };
+    actions.appendChild(cancelBtn);
+    
+    updateModalActionBtn = document.createElement('button');
+    updateModalActionBtn.className = 'sharkord-modal-btn';
+    
+    if (isUpdateReady) {
+      updateModalActionBtn.style.backgroundColor = '#23a559';
+      updateModalActionBtn.style.color = 'white';
+      updateModalActionBtn.innerText = 'Instalar Agora';
+      updateModalActionBtn.onclick = () => window.electronAPI.installUpdate();
+    } else {
+      updateModalActionBtn.style.backgroundColor = '#5865F2';
+      updateModalActionBtn.style.color = 'white';
+      updateModalActionBtn.innerText = 'Buscar Atualizações';
+      updateModalActionBtn.onclick = () => {
+        updateModalActionBtn.innerText = 'Buscando...';
+        updateModalActionBtn.disabled = true;
+        updateModalText.innerText = 'Procurando atualizações no servidor. Aguarde...';
+        window.electronAPI.manualCheckUpdate();
+      };
+    }
+    actions.appendChild(updateModalActionBtn);
+    
+    modal.appendChild(title);
+    modal.appendChild(updateModalText);
+    modal.appendChild(actions);
+    updateModalOverlay.appendChild(modal);
+    
+    document.body.appendChild(updateModalOverlay);
+  });
+  
+  document.body.appendChild(updateBtn);
+
+  // Escuta os status do processo (Baixando, Sem att, etc)
+  if (window.electronAPI && window.electronAPI.onUpdateStatus) {
+    window.electronAPI.onUpdateStatus((event, status) => {
+      if (updateModalText && updateModalActionBtn) {
+        updateModalText.innerText = status;
+        if (status === 'Baixando...') {
+          updateModalText.innerText = 'Encontramos uma atualização! Baixando...';
+          updateModalActionBtn.innerText = 'Aguarde...';
+        } else if (status === 'Sem atualizações') {
+          updateModalText.innerText = 'Você já está na versão mais recente!';
+          updateModalActionBtn.innerText = 'OK';
+          updateModalActionBtn.disabled = false;
+          updateModalActionBtn.onclick = () => {
+            document.body.removeChild(updateModalOverlay);
+            updateModalOverlay = null;
+          };
+        } else if (status === 'Erro na busca') {
+          updateModalText.innerText = 'Ocorreu um erro ao buscar atualizações.';
+          updateModalActionBtn.innerText = 'OK';
+          updateModalActionBtn.disabled = false;
+          updateModalActionBtn.onclick = () => {
+            document.body.removeChild(updateModalOverlay);
+            updateModalOverlay = null;
+          };
+        } else if (status === 'Pronto!') {
+          isUpdateReady = true;
+          updateModalText.innerText = 'Download concluído! Instalar agora?';
+          updateModalActionBtn.innerText = 'Instalar Agora';
+          updateModalActionBtn.style.backgroundColor = '#23a559';
+          updateModalActionBtn.disabled = false;
+          updateModalActionBtn.onclick = () => window.electronAPI.installUpdate();
+        }
+      }
+    });
+  }
+
+  // Escuta se há atualizações prontas para instalar em segundo plano
   if (window.electronAPI && window.electronAPI.onUpdateReady) {
     window.electronAPI.onUpdateReady(() => {
-      const updateBtn = document.createElement('button');
-      updateBtn.className = 'sharkord-update-btn';
-      updateBtn.innerText = 'Atualizar App';
-      updateBtn.title = 'Uma nova atualização foi baixada. Clique para instalar.';
-      
-      updateBtn.addEventListener('click', () => {
-        if(confirm('O aplicativo será fechado para instalar a atualização agora. Continuar?')) {
-          window.electronAPI.installUpdate();
-        }
-      });
-      
-      document.body.appendChild(updateBtn);
+      isUpdateReady = true;
+      updateBtn.innerText = 'Atualização Pronta';
+      updateBtn.style.backgroundColor = '#f59e0b';
+      updateBtn.style.transform = 'translateX(0)';
     });
   }
 });
