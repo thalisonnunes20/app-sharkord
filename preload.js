@@ -11,14 +11,23 @@ window.addEventListener('DOMContentLoaded', () => {
     const style = document.createElement('style');
     style.innerHTML = `
       .sharkord-disconnect-btn {
-        position: fixed; bottom: 20px; right: 20px; z-index: 999999;
-        padding: 8px 16px; background-color: #ef4444; color: #fff;
-        border: none; border-radius: 8px; cursor: pointer;
+        position: fixed; bottom: 80px; right: 0; z-index: 999999;
+        padding: 10px 20px 10px 16px; background-color: #ef4444; color: #fff;
+        border: none; border-radius: 12px 0 0 12px; cursor: pointer;
         font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
-        font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
-        opacity: 0.4; transition: all 0.2s;
+        font-weight: 600; box-shadow: -4px 4px 16px rgba(0,0,0,0.4);
+        opacity: 0.6; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+        transform: translateX(calc(100% - 28px));
+        display: flex; align-items: center; gap: 12px;
       }
-      .sharkord-disconnect-btn:hover { opacity: 1; transform: translateY(-1px); }
+      .sharkord-disconnect-btn::before {
+        content: "◀";
+        font-size: 12px;
+      }
+      .sharkord-disconnect-btn:hover { 
+        transform: translateX(0); 
+        opacity: 1; 
+      }
       .sharkord-modal-overlay {
         position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75);
         backdrop-filter: blur(4px); z-index: 10000000;
