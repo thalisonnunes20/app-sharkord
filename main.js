@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu } = require('electron');
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, shell } = require('electron');
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
@@ -28,6 +28,12 @@ function createWindow() {
   // Força o Electron a ignorar eventos que impedem o descarregamento da página (como streams ativos)
   mainWindow.webContents.on('will-prevent-unload', (event) => {
     event.preventDefault();
+  });
+
+  // Abre links externos (target="_blank") no navegador padrão do sistema em vez de em um popup
+  mainWindow.webContents.setWindowOpenHandler(({ url }) => {
+    shell.openExternal(url);
+    return { action: 'deny' };
   });
 
   // Handle WebRTC Permissions for Sharkord (Camera, Microphone, Screen Sharing)

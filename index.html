@@ -5,69 +5,84 @@
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharkord</title>
   <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    /* Custom CSS just for drag region if needed, but we hid the titlebar */
-    body { user-select: none; }
-  </style>
+  <script>
+    tailwind.config = {
+      theme: {
+        extend: {
+          animation: {
+            'float-1': 'float 20s infinite ease-in-out alternate',
+            'float-2': 'float 25s infinite ease-in-out alternate',
+            'float-3': 'float 30s infinite ease-in-out alternate-reverse',
+          },
+          keyframes: {
+            float: {
+              '0%': { transform: 'translate(0, 0) scale(1)' },
+              '33%': { transform: 'translate(30px, -50px) scale(1.1)' },
+              '66%': { transform: 'translate(-20px, 20px) scale(0.9)' },
+              '100%': { transform: 'translate(40px, 40px) scale(1)' },
+            }
+          }
+        }
+      }
+    }
+  </script>
 </head>
-<body class="bg-[#111214] text-gray-200 h-screen w-screen flex items-center justify-center relative overflow-hidden font-sans">
+<body class="h-screen w-screen flex items-center justify-center relative text-gray-200 select-none bg-[#1e1f22] overflow-hidden font-sans">
   
-  <!-- Subtle Background Decor -->
-  <div class="absolute inset-0 pointer-events-none z-0">
-    <div class="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 blur-[120px] rounded-full"></div>
-    <div class="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-violet-600/10 blur-[120px] rounded-full"></div>
-  </div>
+  <!-- Moving Background Lights (100% Tailwind) -->
+  <div class="absolute blur-[80px] z-0 opacity-50 rounded-full w-[400px] h-[400px] bg-[#5865F2]/15 -top-[100px] -left-[100px] animate-float-1"></div>
+  <div class="absolute blur-[80px] z-0 opacity-50 rounded-full w-[500px] h-[500px] bg-[#23A559]/10 -bottom-[150px] -right-[100px] animate-float-2"></div>
+  <div class="absolute blur-[80px] z-0 opacity-50 rounded-full w-[300px] h-[300px] bg-[#00A8FC]/10 top-[30%] left-[50%] animate-float-3"></div>
 
-  <div class="relative z-10 w-full max-w-md bg-[#2B2D31] rounded-xl shadow-2xl p-8 border border-white/5 animate-fade-in-up">
+  <!-- Main Card -->
+  <div class="relative z-10 w-full max-w-[480px] bg-[#313338] rounded-lg p-8 shadow-lg">
     
+    <!-- Header -->
     <div class="text-center mb-8">
-      <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/10 mb-4 ring-1 ring-indigo-500/20">
-        <svg class="w-8 h-8 text-indigo-400" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-          <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM11 19.93C7.05 19.43 4 16.05 4 12C4 7.95 7.05 4.57 11 4.07V19.93ZM13 4.07C16.95 4.57 20 7.95 20 12C20 16.05 16.95 19.43 13 19.93V4.07Z"/>
-        </svg>
-      </div>
-      <h1 class="text-2xl font-bold text-white tracking-tight mb-2">Boas-vindas ao Sharkord</h1>
-      <p class="text-sm text-gray-400">Insira as credenciais do seu servidor auto-hospedado para conectar.</p>
+      <h1 class="text-[24px] font-bold text-[#f2f3f5] mb-2 tracking-wide">Boas-vindas de volta!</h1>
+      <p class="text-[#b5bac1] text-[15px]">Estamos muito animados em ver você novamente.</p>
     </div>
 
-    <form id="setup-form" class="space-y-6">
-      <div class="space-y-2">
-        <label for="server-url" class="block text-xs font-bold text-gray-400 uppercase tracking-wider">
-          Endereço do Servidor
+    <!-- Form -->
+    <form id="setup-form" class="flex flex-col text-left">
+      <div class="mb-5">
+        <label for="server-url" class="block text-[#b5bac1] text-[12px] font-bold uppercase tracking-wide mb-2">
+          URL do Servidor Sharkord <span class="text-[#fa777c]">*</span>
         </label>
-        <div class="relative">
-          <input 
-            type="url" 
-            id="server-url" 
-            class="w-full bg-[#1E1F22] text-gray-100 px-4 py-3 rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder-gray-600"
-            placeholder="https://demo.sharkord.com" 
-            required 
-            autocomplete="off"
-            spellcheck="false"
-          />
-        </div>
-        <div class="hidden text-red-400 text-xs font-medium mt-1" id="error-message">
-          URL inválida. Use formato http:// ou https://
+        <input 
+          type="url" 
+          id="server-url" 
+          class="w-full bg-[#1e1f22] text-[#dbdee1] p-[10px] rounded-[3px] border-none outline-none focus:ring-1 focus:ring-[#5865F2] transition-shadow text-[16px]"
+          placeholder="https://seu-servidor.com" 
+          required 
+          autocomplete="off"
+          spellcheck="false"
+        />
+        <div class="hidden text-[#fa777c] text-[12px] mt-1.5 font-medium" id="error-message">
+          Por favor, insira uma URL válida.
         </div>
       </div>
 
       <button 
         type="submit" 
-        class="w-full bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg shadow-indigo-500/20 flex items-center justify-center submit-btn">
-        <span class="btn-text">Conectar ao Servidor</span>
+        class="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium text-[16px] py-[10px] px-4 rounded-[3px] transition-colors duration-200 submit-btn mt-2">
+        Entrar
       </button>
     </form>
-  </div>
+    
+    <!-- Links de Ajuda -->
+    <div class="mt-6 text-[#b5bac1] text-[12px] flex flex-col gap-2 items-center text-center">
+      <span>
+        Problemas com a plataforma? 
+        <a href="https://github.com/sharkord/sharkord" target="_blank" class="text-[#00A8FC] hover:underline">Acesse o repositório oficial do Sharkord.</a>
+      </span>
+      <span>
+        Dúvidas sobre este App para Windows? 
+        <a href="https://github.com/thalisonnunes20/app-sharkord" target="_blank" class="text-[#00A8FC] hover:underline">Acesse o nosso repositório.</a>
+      </span>
+    </div>
 
-  <style>
-    @keyframes fadeInUp {
-      from { opacity: 0; transform: translateY(10px); }
-      to { opacity: 1; transform: translateY(0); }
-    }
-    .animate-fade-in-up {
-      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
-    }
-  </style>
+  </div>
 
   <script src="renderer.js"></script>
 </body>
