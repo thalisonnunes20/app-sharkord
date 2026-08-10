@@ -26,3 +26,9 @@ Ao abrir o aplicativo pela primeira vez, voce sera recebido por uma tela de conf
 Como esta e uma ferramenta de codigo aberto focada na comunidade e sem restricoes lucrativas, qualquer contribuicao para aprimorar a seguranca, desempenho ou compatibilidade deste cliente desktop e amplamente encorajada e apreciada. 
 
 Para colaborar, sinta-se livre para clonar o repositorio, testar as ferramentas e abrir pull requests.
+
+## Projeto Original
+
+Este aplicativo foi desenvolvido para se conectar a servidores da plataforma Sharkord. Voce pode encontrar o codigo fonte e toda a documentacao do projeto web oficial e original no link abaixo:
+
+[Repositorio Original do Sharkord](https://github.com/sharkord/sharkord)
