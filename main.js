@@ -96,6 +96,14 @@ ipcMain.on('save-server-url', (event, url) => {
   }
 });
 
+// IPC Handler to clear the URL and go back to setup
+ipcMain.on('clear-server-url', (event) => {
+  store.delete('sharkordServerUrl');
+  if (mainWindow) {
+    mainWindow.loadFile('index.html');
+  }
+});
+
 // Setup autoUpdater logging
 autoUpdater.on('update-available', () => {
   console.log('Update available.');
