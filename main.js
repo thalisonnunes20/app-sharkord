@@ -26,6 +26,16 @@ function createWindow() {
     autoUpdater.checkForUpdatesAndNotify();
   });
 
+  // Handle updates downloaded
+  autoUpdater.on('update-downloaded', () => {
+    mainWindow.webContents.send('update-ready');
+  });
+
+  // Handle install command from UI
+  ipcMain.on('install-update', () => {
+    autoUpdater.quitAndInstall();
+  });
+
   // Força o Electron a ignorar eventos que impedem o descarregamento da página (como streams ativos)
   mainWindow.webContents.on('will-prevent-unload', (event) => {
     event.preventDefault();
@@ -120,11 +130,17 @@ ipcMain.on('save-server-url', (event, url) => {
 });
 
 // IPC Handler to clear the URL and go back to setup
+// IPC Handler to clear the URL and go back to setup
 ipcMain.on('clear-server-url', (event) => {
   store.delete('sharkordServerUrl');
   if (mainWindow) {
     mainWindow.loadFile('index.html');
   }
+});
+
+// Fornece a versão do aplicativo para a UI
+ipcMain.handle('get-version', () => {
+  return app.getVersion();
 });
 
 // Setup autoUpdater logging

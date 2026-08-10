@@ -1,11 +1,22 @@
 const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
-  saveServerUrl: (url) => ipcRenderer.send('save-server-url', url)
+  saveServerUrl: (url) => ipcRenderer.send('save-server-url', url),
+  getVersion: () => ipcRenderer.invoke('get-version'),
+  onUpdateReady: (callback) => ipcRenderer.on('update-ready', callback),
+  installUpdate: () => ipcRenderer.send('install-update')
 });
 
-// Injeta um botão flutuante de desconectar na página web do Sharkord
-window.addEventListener('DOMContentLoaded', () => {
+// Injeta lógica de atualização e botão flutuante na página web do Sharkord
+window.addEventListener('DOMContentLoaded', async () => {
+  // Configura a versão da tela inicial se ela existir
+  const versionEl = document.getElementById('app-version');
+  if (versionEl && window.electronAPI && window.electronAPI.getVersion) {
+    const v = await window.electronAPI.getVersion();
+    versionEl.innerText = 'v' + v;
+  }
+
+  // Se estivermos dentro do servidor Sharkord, injetamos o botão de Sair
   if (window.location.protocol.startsWith('http')) {
     // Inject custom Tailwind-like CSS for the modal
     const style = document.createElement('style');
@@ -25,6 +36,24 @@ window.addEventListener('DOMContentLoaded', () => {
         font-size: 12px;
       }
       .sharkord-disconnect-btn:hover { 
+        transform: translateX(0); 
+        opacity: 1; 
+      }
+      .sharkord-update-btn {
+        position: fixed; top: 20px; right: 0; z-index: 999999;
+        padding: 10px 20px 10px 16px; background-color: #23a559; color: #fff;
+        border: none; border-radius: 12px 0 0 12px; cursor: pointer;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        font-weight: 600; box-shadow: -4px 4px 16px rgba(0,0,0,0.4);
+        opacity: 0.9; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+        transform: translateX(calc(100% - 28px));
+        display: flex; align-items: center; gap: 12px;
+      }
+      .sharkord-update-btn::before {
+        content: "⭐";
+        font-size: 12px;
+      }
+      .sharkord-update-btn:hover { 
         transform: translateX(0); 
         opacity: 1; 
       }
@@ -100,6 +129,24 @@ window.addEventListener('DOMContentLoaded', () => {
     });
     
     document.body.appendChild(btn);
+  }
+
+  // Escuta se há atualizações prontas
+  if (window.electronAPI && window.electronAPI.onUpdateReady) {
+    window.electronAPI.onUpdateReady(() => {
+      const updateBtn = document.createElement('button');
+      updateBtn.className = 'sharkord-update-btn';
+      updateBtn.innerText = 'Atualizar App';
+      updateBtn.title = 'Uma nova atualização foi baixada. Clique para instalar.';
+      
+      updateBtn.addEventListener('click', () => {
+        if(confirm('O aplicativo será fechado para instalar a atualização agora. Continuar?')) {
+          window.electronAPI.installUpdate();
+        }
+      });
+      
+      document.body.appendChild(updateBtn);
+    });
   }
 });
 
