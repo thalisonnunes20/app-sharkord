@@ -2,35 +2,6 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   saveServerUrl: (url) => ipcRenderer.send('save-server-url', url)
-});
-
-// Rastreamento de streams de mídia (Câmera, Microfone, Tela)
-const activeStreams = [];
-
-const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
-navigator.mediaDevices.getUserMedia = async (constraints) => {
-  const stream = await originalGetUserMedia(constraints);
-  activeStreams.push(stream);
-  return stream;
-};
-
-const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
-navigator.mediaDevices.getDisplayMedia = async (options) => {
-  const stream = await originalGetDisplayMedia(options);
-  activeStreams.push(stream);
-  return stream;
-};
-
-function hasActiveMedia() {
-  return activeStreams.some(stream => stream.active);
-}
-
-function forceStopAllMedia() {
-  activeStreams.forEach(stream => {
-    stream.getTracks().forEach(track => track.stop());
-  });
-}
-
 // Injeta um botão flutuante de desconectar na página web do Sharkord
 window.addEventListener('DOMContentLoaded', () => {
   if (window.location.protocol.startsWith('http')) {
@@ -77,8 +48,6 @@ window.addEventListener('DOMContentLoaded', () => {
     btn.innerText = 'Sair do Servidor';
     
     btn.addEventListener('click', () => {
-      const isSharing = hasActiveMedia();
-      
       const overlay = document.createElement('div');
       overlay.className = 'sharkord-modal-overlay';
       
@@ -87,15 +56,11 @@ window.addEventListener('DOMContentLoaded', () => {
       
       const title = document.createElement('h3');
       title.className = 'sharkord-modal-title';
-      title.innerText = 'Desconectar';
+      title.innerText = 'Desconectar do Servidor';
       
       const text = document.createElement('p');
       text.className = 'sharkord-modal-text';
-      if (isSharing) {
-        text.innerHTML = 'Tem certeza que deseja sair do servidor? <br><br><span class="sharkord-modal-warning">Atenção:</span> Você possui transmissões ativas (Tela/Câmera). Elas serão encerradas automaticamente ao sair.';
-      } else {
-        text.innerText = 'Tem certeza que deseja desconectar deste servidor? Você precisará digitar a URL novamente caso queira voltar.';
-      }
+      text.innerHTML = 'Tem certeza que deseja desconectar? Você precisará digitar a URL novamente caso queira voltar.<br><br><span class="sharkord-modal-warning">Nota:</span> Se houver transmissões ativas (Tela/Câmera), elas serão encerradas forçadamente ao sair.';
       
       const actions = document.createElement('div');
       actions.className = 'sharkord-modal-actions';
@@ -107,11 +72,8 @@ window.addEventListener('DOMContentLoaded', () => {
       
       const confirmBtn = document.createElement('button');
       confirmBtn.className = 'sharkord-modal-btn sharkord-modal-btn-confirm';
-      confirmBtn.innerText = 'Sair do Servidor';
+      confirmBtn.innerText = 'Sair e Desconectar';
       confirmBtn.onclick = () => {
-        if (isSharing) {
-          forceStopAllMedia();
-        }
         ipcRenderer.send('clear-server-url');
       };
       

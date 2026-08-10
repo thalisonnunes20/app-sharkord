@@ -25,6 +25,11 @@ function createWindow() {
     autoUpdater.checkForUpdatesAndNotify();
   });
 
+  // Força o Electron a ignorar eventos que impedem o descarregamento da página (como streams ativos)
+  mainWindow.webContents.on('will-prevent-unload', (event) => {
+    event.preventDefault();
+  });
+
   // Handle WebRTC Permissions for Sharkord (Camera, Microphone, Screen Sharing)
   session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
     callback(true);
