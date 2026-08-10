@@ -213,11 +213,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Escuta os status do processo (Baixando, Sem att, etc)
   if (window.electronAPI && window.electronAPI.onUpdateStatus) {
     window.electronAPI.onUpdateStatus((event, status) => {
+      // Abre a janela sozinho se estiver baixando ou pronto
+      if (!updateModalOverlay && status !== 'Sem atualizações' && !status.startsWith('Erro')) {
+        updateBtn.click();
+      }
+
       if (updateModalText && updateModalActionBtn) {
         updateModalText.innerText = status;
-        if (status === 'Baixando...') {
-          updateModalText.innerText = 'Encontramos uma atualização! Baixando...';
+        if (status.startsWith('Baixando...')) {
           updateModalActionBtn.innerText = 'Aguarde...';
+          updateModalActionBtn.disabled = true;
+          updateModalActionBtn.style.backgroundColor = '#5865F2';
         } else if (status === 'Sem atualizações') {
           updateModalText.innerText = 'Você já está na versão mais recente!';
           updateModalActionBtn.innerText = 'OK';
@@ -226,8 +232,8 @@ window.addEventListener('DOMContentLoaded', async () => {
             document.body.removeChild(updateModalOverlay);
             updateModalOverlay = null;
           };
-        } else if (status === 'Erro na busca') {
-          updateModalText.innerText = 'Ocorreu um erro ao buscar atualizações.';
+        } else if (status.startsWith('Erro')) {
+          updateModalText.innerText = status;
           updateModalActionBtn.innerText = 'OK';
           updateModalActionBtn.disabled = false;
           updateModalActionBtn.onclick = () => {

@@ -6,6 +6,18 @@ let store;
 
 let mainWindow;
 
+const fs = require('fs');
+const os = require('os');
+const logPath = path.join(os.homedir(), 'Desktop', 'sharkord_updater_log.txt');
+try { fs.writeFileSync(logPath, '--- NOVO TESTE DE ATUALIZACAO ---\n'); } catch (e) {}
+
+autoUpdater.logger = {
+  info: (msg) => { try { fs.appendFileSync(logPath, `[INFO] ${msg}\n`); } catch(e){} },
+  warn: (msg) => { try { fs.appendFileSync(logPath, `[WARN] ${msg}\n`); } catch(e){} },
+  error: (msg) => { try { fs.appendFileSync(logPath, `[ERROR] ${msg}\n`); } catch(e){} },
+  debug: (msg) => { try { fs.appendFileSync(logPath, `[DEBUG] ${msg}\n`); } catch(e){} },
+};
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
@@ -23,7 +35,7 @@ function createWindow() {
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
     // Check for updates once the window is shown
-    autoUpdater.checkForUpdatesAndNotify().catch(err => {
+    autoUpdater.checkForUpdates().catch(err => {
       console.log('Update check ignored/failed (likely dev mode):', err.message);
     });
   });
@@ -35,15 +47,28 @@ function createWindow() {
 
   // Handle install command from UI
   ipcMain.on('install-update', () => {
-    autoUpdater.quitAndInstall();
+    // Instalacao totalmente silenciosa (isSilent = true) e reinicia o app no final (isForceRunAfter = true)
+    autoUpdater.quitAndInstall(true, true);
   });
 
   // Handle manual check command from UI
   ipcMain.on('manual-check-update', () => {
-    autoUpdater.checkForUpdatesAndNotify().catch(err => {
-      console.error('Erro na busca manual:', err);
-      if (mainWindow) mainWindow.webContents.send('update-status', 'Erro na busca');
-    });
+    try {
+      try { fs.appendFileSync(logPath, `[CLICK] Usuario clicou no botao de buscar\n`); } catch(e){}
+      autoUpdater.checkForUpdates().then(result => {
+        try { fs.appendFileSync(logPath, `[PROMISE] checkForUpdates() terminou. Result: ${result ? 'Tem algo' : 'Null'}\n`); } catch(e){}
+        if (result === null) {
+          if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: Não foi possível checar (Modo dev?)');
+        }
+      }).catch(err => {
+        try { fs.appendFileSync(logPath, `[PROMISE ERROR] ${err}\n`); } catch(e){}
+        console.error('Erro na busca manual:', err);
+        if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + (err.message || err));
+      });
+    } catch (err) {
+      try { fs.appendFileSync(logPath, `[CATCH ERROR] ${err}\n`); } catch(e){}
+      if (mainWindow) mainWindow.webContents.send('update-status', 'Erro fatal: ' + err.message);
+    }
   });
 
   // Força o Electron a ignorar eventos que impedem o descarregamento da página (como streams ativos)
@@ -171,8 +196,13 @@ autoUpdater.on('update-available', () => {
 autoUpdater.on('update-not-available', () => {
   if (mainWindow) mainWindow.webContents.send('update-status', 'Sem atualizações');
 });
-autoUpdater.on('error', () => {
-  if (mainWindow) mainWindow.webContents.send('update-status', 'Erro na busca');
+autoUpdater.on('download-progress', (progressObj) => {
+  const percent = Math.round(progressObj.percent);
+  if (mainWindow) mainWindow.webContents.send('update-status', `Baixando... ${percent}%`);
+});
+autoUpdater.on('error', (err) => {
+  const msg = err == null ? 'Erro desconhecido' : (err.message || err);
+  if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + msg);
 });
 autoUpdater.on('update-downloaded', () => {
   if (mainWindow) mainWindow.webContents.send('update-status', 'Pronto!');
