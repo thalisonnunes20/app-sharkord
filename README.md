@@ -32,3 +32,11 @@ Para colaborar, sinta-se livre para clonar o repositorio, testar as ferramentas 
 Este aplicativo foi desenvolvido para se conectar a servidores da plataforma Sharkord. Voce pode encontrar o codigo fonte e toda a documentacao do projeto web oficial e original no link abaixo:
 
 [Repositorio Original do Sharkord](https://github.com/sharkord/sharkord)
+
+## Aos Desenvolvedores Originais
+
+Este projeto foi criado inteiramente por admiradores da plataforma Sharkord. Nossa unica intencao e fornecer uma alternativa de acesso mais pratica (um *wrapper* nativo) para facilitar a experiencia dos usuarios em computadores de mesa, expandindo o alcance e a utilidade da excelente ferramenta original. 
+
+Reforcamos que **nao ha intencao de plagio, clonagem ou roubo de propriedade intelectual**, e o aplicativo e disponibilizado de forma estritamente gratuita e open-source.
+
+Caso a equipe de desenvolvimento ou o criador original do Sharkord tenha alguma objeção a este cliente desktop ou deseje que este repositorio seja removido, pedimos que, por gentileza, entre em contato. Respeitamos totalmente os direitos dos criadores originais e atenderemos prontamente a qualquer solicitacao formal de remocao.

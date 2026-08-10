@@ -4,36 +4,70 @@
   <meta charset="UTF-8">
   <meta name="viewport" content="width=device-width, initial-scale=1.0">
   <title>Sharkord</title>
-  <link rel="stylesheet" href="index.css">
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    /* Custom CSS just for drag region if needed, but we hid the titlebar */
+    body { user-select: none; }
+  </style>
 </head>
-<body>
+<body class="bg-[#111214] text-gray-200 h-screen w-screen flex items-center justify-center relative overflow-hidden font-sans">
   
-  <div class="container">
-    <div class="logo-container">
-      <!-- Icone SVG generico de servidor/conexao -->
-      <svg class="logo" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
-        <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM11 19.93C7.05 19.43 4 16.05 4 12C4 7.95 7.05 4.57 11 4.07V19.93ZM13 4.07C16.95 4.57 20 7.95 20 12C20 16.05 16.95 19.43 13 19.93V4.07Z"/>
-      </svg>
-      <h1>Boas-vindas ao Sharkord!</h1>
-      <p>Conecte-se ao seu servidor para começar a conversar.</p>
+  <!-- Subtle Background Decor -->
+  <div class="absolute inset-0 pointer-events-none z-0">
+    <div class="absolute top-[-20%] left-[-10%] w-[50%] h-[50%] bg-indigo-600/10 blur-[120px] rounded-full"></div>
+    <div class="absolute bottom-[-20%] right-[-10%] w-[50%] h-[50%] bg-violet-600/10 blur-[120px] rounded-full"></div>
+  </div>
+
+  <div class="relative z-10 w-full max-w-md bg-[#2B2D31] rounded-xl shadow-2xl p-8 border border-white/5 animate-fade-in-up">
+    
+    <div class="text-center mb-8">
+      <div class="inline-flex items-center justify-center w-16 h-16 rounded-full bg-indigo-500/10 mb-4 ring-1 ring-indigo-500/20">
+        <svg class="w-8 h-8 text-indigo-400" fill="currentColor" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg">
+          <path d="M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM11 19.93C7.05 19.43 4 16.05 4 12C4 7.95 7.05 4.57 11 4.07V19.93ZM13 4.07C16.95 4.57 20 7.95 20 12C20 16.05 16.95 19.43 13 19.93V4.07Z"/>
+        </svg>
+      </div>
+      <h1 class="text-2xl font-bold text-white tracking-tight mb-2">Boas-vindas ao Sharkord</h1>
+      <p class="text-sm text-gray-400">Insira as credenciais do seu servidor auto-hospedado para conectar.</p>
     </div>
 
-    <form id="setup-form">
-      <div class="input-group">
-        <label for="server-url">Endereço do Servidor</label>
-        <input 
-          type="url" 
-          id="server-url" 
-          placeholder="ex: https://demo.sharkord.com" 
-          required 
-          autocomplete="off"
-          spellcheck="false"
-        />
-        <div class="error-message" id="error-message">Por favor, insira uma URL válida (http/https).</div>
+    <form id="setup-form" class="space-y-6">
+      <div class="space-y-2">
+        <label for="server-url" class="block text-xs font-bold text-gray-400 uppercase tracking-wider">
+          Endereço do Servidor
+        </label>
+        <div class="relative">
+          <input 
+            type="url" 
+            id="server-url" 
+            class="w-full bg-[#1E1F22] text-gray-100 px-4 py-3 rounded-lg border-none focus:outline-none focus:ring-2 focus:ring-indigo-500 transition-all placeholder-gray-600"
+            placeholder="https://demo.sharkord.com" 
+            required 
+            autocomplete="off"
+            spellcheck="false"
+          />
+        </div>
+        <div class="hidden text-red-400 text-xs font-medium mt-1" id="error-message">
+          URL inválida. Use formato http:// ou https://
+        </div>
       </div>
-      <button type="submit" class="submit-btn">Conectar</button>
+
+      <button 
+        type="submit" 
+        class="w-full bg-indigo-500 hover:bg-indigo-600 active:scale-[0.98] text-white font-medium py-3 rounded-lg transition-all duration-200 shadow-lg shadow-indigo-500/20 flex items-center justify-center submit-btn">
+        <span class="btn-text">Conectar ao Servidor</span>
+      </button>
     </form>
   </div>
+
+  <style>
+    @keyframes fadeInUp {
+      from { opacity: 0; transform: translateY(10px); }
+      to { opacity: 1; transform: translateY(0); }
+    }
+    .animate-fade-in-up {
+      animation: fadeInUp 0.5s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+    }
+  </style>
 
   <script src="renderer.js"></script>
 </body>

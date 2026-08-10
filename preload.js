@@ -4,34 +4,126 @@ contextBridge.exposeInMainWorld('electronAPI', {
   saveServerUrl: (url) => ipcRenderer.send('save-server-url', url)
 });
 
+// Rastreamento de streams de mídia (Câmera, Microfone, Tela)
+const activeStreams = [];
+
+const originalGetUserMedia = navigator.mediaDevices.getUserMedia.bind(navigator.mediaDevices);
+navigator.mediaDevices.getUserMedia = async (constraints) => {
+  const stream = await originalGetUserMedia(constraints);
+  activeStreams.push(stream);
+  return stream;
+};
+
+const originalGetDisplayMedia = navigator.mediaDevices.getDisplayMedia.bind(navigator.mediaDevices);
+navigator.mediaDevices.getDisplayMedia = async (options) => {
+  const stream = await originalGetDisplayMedia(options);
+  activeStreams.push(stream);
+  return stream;
+};
+
+function hasActiveMedia() {
+  return activeStreams.some(stream => stream.active);
+}
+
+function forceStopAllMedia() {
+  activeStreams.forEach(stream => {
+    stream.getTracks().forEach(track => track.stop());
+  });
+}
+
 // Injeta um botão flutuante de desconectar na página web do Sharkord
 window.addEventListener('DOMContentLoaded', () => {
   if (window.location.protocol.startsWith('http')) {
+    // Inject custom Tailwind-like CSS for the modal
+    const style = document.createElement('style');
+    style.innerHTML = `
+      .sharkord-disconnect-btn {
+        position: fixed; bottom: 20px; right: 20px; z-index: 999999;
+        padding: 8px 16px; background-color: #ef4444; color: #fff;
+        border: none; border-radius: 8px; cursor: pointer;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        font-weight: 600; box-shadow: 0 4px 6px -1px rgba(0,0,0,0.1), 0 2px 4px -1px rgba(0,0,0,0.06);
+        opacity: 0.4; transition: all 0.2s;
+      }
+      .sharkord-disconnect-btn:hover { opacity: 1; transform: translateY(-1px); }
+      .sharkord-modal-overlay {
+        position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75);
+        backdrop-filter: blur(4px); z-index: 10000000;
+        display: flex; align-items: center; justify-content: center;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+      }
+      .sharkord-modal-box {
+        background-color: #2b2d31; color: #dbdee1; padding: 24px;
+        border-radius: 12px; width: 100%; max-width: 400px;
+        box-shadow: 0 20px 25px -5px rgba(0,0,0,0.3);
+      }
+      .sharkord-modal-title { font-size: 1.25rem; font-weight: 700; color: #f2f3f5; margin-top: 0; margin-bottom: 8px; }
+      .sharkord-modal-text { font-size: 0.875rem; margin-bottom: 24px; color: #b5bac1; line-height: 1.5; }
+      .sharkord-modal-warning { color: #facc15; font-weight: 600; }
+      .sharkord-modal-actions { display: flex; justify-content: flex-end; gap: 12px; }
+      .sharkord-modal-btn {
+        padding: 8px 16px; border-radius: 4px; border: none;
+        font-weight: 500; cursor: pointer; transition: background-color 0.2s;
+      }
+      .sharkord-modal-btn-cancel { background-color: transparent; color: #f2f3f5; }
+      .sharkord-modal-btn-cancel:hover { text-decoration: underline; }
+      .sharkord-modal-btn-confirm { background-color: #da373c; color: white; }
+      .sharkord-modal-btn-confirm:hover { background-color: #a12828; }
+    `;
+    document.head.appendChild(style);
+
     const btn = document.createElement('button');
+    btn.className = 'sharkord-disconnect-btn';
     btn.innerText = 'Sair do Servidor';
-    btn.style.position = 'fixed';
-    btn.style.bottom = '20px';
-    btn.style.right = '20px';
-    btn.style.zIndex = '999999';
-    btn.style.padding = '8px 16px';
-    btn.style.backgroundColor = '#fa777c';
-    btn.style.color = '#fff';
-    btn.style.border = 'none';
-    btn.style.borderRadius = '8px';
-    btn.style.cursor = 'pointer';
-    btn.style.fontFamily = 'sans-serif';
-    btn.style.fontWeight = 'bold';
-    btn.style.boxShadow = '0 4px 12px rgba(0,0,0,0.3)';
-    btn.style.opacity = '0.3';
-    btn.style.transition = 'opacity 0.2s';
-    
-    btn.addEventListener('mouseenter', () => btn.style.opacity = '1');
-    btn.addEventListener('mouseleave', () => btn.style.opacity = '0.3');
     
     btn.addEventListener('click', () => {
-      if(confirm('Tem certeza que deseja desconectar deste servidor? Você precisará digitar a URL novamente.')) {
-        ipcRenderer.send('clear-server-url');
+      const isSharing = hasActiveMedia();
+      
+      const overlay = document.createElement('div');
+      overlay.className = 'sharkord-modal-overlay';
+      
+      const modal = document.createElement('div');
+      modal.className = 'sharkord-modal-box';
+      
+      const title = document.createElement('h3');
+      title.className = 'sharkord-modal-title';
+      title.innerText = 'Desconectar';
+      
+      const text = document.createElement('p');
+      text.className = 'sharkord-modal-text';
+      if (isSharing) {
+        text.innerHTML = 'Tem certeza que deseja sair do servidor? <br><br><span class="sharkord-modal-warning">Atenção:</span> Você possui transmissões ativas (Tela/Câmera). Elas serão encerradas automaticamente ao sair.';
+      } else {
+        text.innerText = 'Tem certeza que deseja desconectar deste servidor? Você precisará digitar a URL novamente caso queira voltar.';
       }
+      
+      const actions = document.createElement('div');
+      actions.className = 'sharkord-modal-actions';
+      
+      const cancelBtn = document.createElement('button');
+      cancelBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
+      cancelBtn.innerText = 'Cancelar';
+      cancelBtn.onclick = () => document.body.removeChild(overlay);
+      
+      const confirmBtn = document.createElement('button');
+      confirmBtn.className = 'sharkord-modal-btn sharkord-modal-btn-confirm';
+      confirmBtn.innerText = 'Sair do Servidor';
+      confirmBtn.onclick = () => {
+        if (isSharing) {
+          forceStopAllMedia();
+        }
+        ipcRenderer.send('clear-server-url');
+      };
+      
+      actions.appendChild(cancelBtn);
+      actions.appendChild(confirmBtn);
+      
+      modal.appendChild(title);
+      modal.appendChild(text);
+      modal.appendChild(actions);
+      overlay.appendChild(modal);
+      
+      document.body.appendChild(overlay);
     });
     
     document.body.appendChild(btn);
