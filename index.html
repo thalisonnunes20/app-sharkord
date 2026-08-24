@@ -64,6 +64,9 @@
         <div class="hidden text-[#fa777c] text-[12px] mt-1.5 font-medium" id="error-message">
           Por favor, insira uma URL válida.
         </div>
+        <div class="text-[#b5bac1] text-[11px] mt-2 leading-relaxed">
+          O endereço deve pertencer a um servidor válido e começar com o subdomínio <span class="text-white font-semibold">sharkord.</span> (ex: https://sharkord.dominio.com).
+        </div>
       </div>
 
       <button 
@@ -71,6 +74,14 @@
         class="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium text-[16px] py-[10px] px-4 rounded-[3px] transition-colors duration-200 submit-btn mt-2">
         Entrar
       </button>
+
+      <!-- Servidores Recentes -->
+      <div id="recent-servers-container" class="hidden mt-6 pt-4 border-t border-[#1e1f22]">
+        <h3 class="text-[#b5bac1] text-[11px] font-bold uppercase tracking-wide mb-2">Acessados Recentemente</h3>
+        <div id="recent-servers-list" class="flex flex-col gap-2">
+          <!-- Inserido pelo JS -->
+        </div>
+      </div>
     </form>
     
     <!-- Links de Ajuda -->
@@ -89,7 +100,7 @@
 
   <!-- App Version -->
   <div id="app-version" class="absolute bottom-4 right-4 text-[#80848e] text-[11px] font-medium tracking-wide">
-    v1.0.7
+    v1.0.8
   </div>
 
   <script src="renderer.js"></script>

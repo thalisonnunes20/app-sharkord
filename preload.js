@@ -2,6 +2,7 @@ const { contextBridge, ipcRenderer } = require('electron');
 
 contextBridge.exposeInMainWorld('electronAPI', {
   saveServerUrl: (url) => ipcRenderer.send('save-server-url', url),
+  getRecentServers: () => ipcRenderer.invoke('get-recent-servers'),
   getVersion: () => ipcRenderer.invoke('get-version'),
   onUpdateReady: (callback) => ipcRenderer.on('update-ready', callback),
   installUpdate: () => ipcRenderer.send('install-update'),

@@ -6,17 +6,8 @@ let store;
 
 let mainWindow;
 
-const fs = require('fs');
-const os = require('os');
-const logPath = path.join(os.homedir(), 'Desktop', 'sharkord_updater_log.txt');
-try { fs.writeFileSync(logPath, '--- NOVO TESTE DE ATUALIZACAO ---\n'); } catch (e) {}
-
-autoUpdater.logger = {
-  info: (msg) => { try { fs.appendFileSync(logPath, `[INFO] ${msg}\n`); } catch(e){} },
-  warn: (msg) => { try { fs.appendFileSync(logPath, `[WARN] ${msg}\n`); } catch(e){} },
-  error: (msg) => { try { fs.appendFileSync(logPath, `[ERROR] ${msg}\n`); } catch(e){} },
-  debug: (msg) => { try { fs.appendFileSync(logPath, `[DEBUG] ${msg}\n`); } catch(e){} },
-};
+// Fix para lentidão da câmera no Windows
+app.commandLine.appendSwitch('disable-features', 'MediaFoundationVideoCapture');
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -54,19 +45,15 @@ function createWindow() {
   // Handle manual check command from UI
   ipcMain.on('manual-check-update', () => {
     try {
-      try { fs.appendFileSync(logPath, `[CLICK] Usuario clicou no botao de buscar\n`); } catch(e){}
       autoUpdater.checkForUpdates().then(result => {
-        try { fs.appendFileSync(logPath, `[PROMISE] checkForUpdates() terminou. Result: ${result ? 'Tem algo' : 'Null'}\n`); } catch(e){}
         if (result === null) {
           if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: Não foi possível checar (Modo dev?)');
         }
       }).catch(err => {
-        try { fs.appendFileSync(logPath, `[PROMISE ERROR] ${err}\n`); } catch(e){}
         console.error('Erro na busca manual:', err);
         if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + (err.message || err));
       });
     } catch (err) {
-      try { fs.appendFileSync(logPath, `[CATCH ERROR] ${err}\n`); } catch(e){}
       if (mainWindow) mainWindow.webContents.send('update-status', 'Erro fatal: ' + err.message);
     }
   });
@@ -80,6 +67,19 @@ function createWindow() {
   mainWindow.webContents.setWindowOpenHandler(({ url }) => {
     shell.openExternal(url);
     return { action: 'deny' };
+  });
+
+  // Impede navegação para domínios não autorizados (whitelist)
+  mainWindow.webContents.on('will-navigate', (event, url) => {
+    try {
+      const urlObj = new URL(url);
+      if (urlObj.protocol === 'file:') return; // Permite index.html local
+      
+      if (!urlObj.hostname.startsWith('sharkord.')) {
+        event.preventDefault();
+        console.warn(`Navegação bloqueada para: ${url}`);
+      }
+    } catch (e) {}
   });
 
   // Lida com falhas de carregamento (URL inválida, servidor offline, etc)
@@ -170,9 +170,21 @@ app.on('window-all-closed', function () {
 // IPC Handler to save the URL from the setup screen
 ipcMain.on('save-server-url', (event, url) => {
   store.set('sharkordServerUrl', url);
+  
+  // Atualiza histórico de servidores recentes (max 2)
+  let recents = store.get('recentServers') || [];
+  recents = recents.filter(item => item !== url); // Remove se já existir para colocar no topo
+  recents.unshift(url);
+  if (recents.length > 2) recents = recents.slice(0, 2);
+  store.set('recentServers', recents);
+
   if (mainWindow) {
     mainWindow.loadURL(url);
   }
+});
+
+ipcMain.handle('get-recent-servers', () => {
+  return store.get('recentServers') || [];
 });
 
 // IPC Handler to clear the URL and go back to setup
