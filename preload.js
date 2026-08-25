@@ -8,7 +8,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   installUpdate: () => ipcRenderer.send('install-update'),
   manualCheckUpdate: () => ipcRenderer.send('manual-check-update'),
   onUpdateStatus: (callback) => ipcRenderer.on('update-status', callback),
-  onConnectionError: (callback) => ipcRenderer.on('connection-error', callback)
+  onConnectionError: (callback) => ipcRenderer.on('connection-error', callback),
+  getAutoStart: () => ipcRenderer.invoke('get-auto-start'),
+  toggleAutoStart: (enable) => ipcRenderer.invoke('toggle-auto-start', enable)
 });
 
 // Injeta lógica de atualização e botão flutuante na página web do Sharkord
@@ -59,6 +61,62 @@ window.addEventListener('DOMContentLoaded', async () => {
       .sharkord-update-btn:hover { 
         transform: translateX(0); 
         opacity: 1; 
+      }
+      .sharkord-settings-btn {
+        position: fixed; bottom: 180px; right: 0; z-index: 999999;
+        padding: 10px 20px 10px 16px; background-color: #5865F2; color: #fff;
+        border: none; border-radius: 12px 0 0 12px; cursor: pointer;
+        font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+        font-weight: 600; box-shadow: -4px 4px 16px rgba(0,0,0,0.4);
+        opacity: 0.6; transition: transform 0.3s cubic-bezier(0.4, 0, 0.2, 1), opacity 0.3s;
+        transform: translateX(calc(100% - 28px));
+        display: flex; align-items: center; gap: 12px;
+      }
+      .sharkord-settings-btn::before {
+        content: "⚙";
+        font-size: 14px;
+        font-weight: bold;
+      }
+      .sharkord-settings-btn:hover { 
+        transform: translateX(0); 
+        opacity: 1; 
+      }
+      .sharkord-toggle-switch {
+        position: relative;
+        display: inline-block;
+        width: 40px;
+        height: 24px;
+      }
+      .sharkord-toggle-switch input {
+        opacity: 0;
+        width: 0;
+        height: 0;
+      }
+      .sharkord-toggle-slider {
+        position: absolute;
+        cursor: pointer;
+        top: 0; left: 0; right: 0; bottom: 0;
+        background-color: #80848e;
+        transition: .3s;
+        border-radius: 24px;
+      }
+      .sharkord-toggle-slider:before {
+        position: absolute;
+        content: "";
+        height: 18px;
+        width: 18px;
+        left: 3px;
+        bottom: 3px;
+        background-color: white;
+        transition: .3s;
+        border-radius: 50%;
+        box-shadow: 0 2px 4px rgba(0,0,0,0.2);
+      }
+      .sharkord-toggle-switch input:checked + .sharkord-toggle-slider {
+        background-color: #5865F2;
+      }
+      .sharkord-toggle-switch input:checked + .sharkord-toggle-slider:before {
+        transform: translateX(16px);
       }
       .sharkord-modal-overlay {
         position: fixed; inset: 0; background-color: rgba(0, 0, 0, 0.75);
@@ -210,6 +268,91 @@ window.addEventListener('DOMContentLoaded', async () => {
   });
   
   document.body.appendChild(updateBtn);
+
+  // Criação do botão de configurações
+  const settingsBtn = document.createElement('button');
+  settingsBtn.className = 'sharkord-settings-btn';
+  settingsBtn.innerText = 'Configurações';
+
+  settingsBtn.addEventListener('click', async () => {
+    // Busca o status atual
+    let isAutoStart = false;
+    if (window.electronAPI && window.electronAPI.getAutoStart) {
+      isAutoStart = await window.electronAPI.getAutoStart();
+    }
+
+    const overlay = document.createElement('div');
+    overlay.className = 'sharkord-modal-overlay';
+    
+    const modal = document.createElement('div');
+    modal.className = 'sharkord-modal-box';
+    
+    const title = document.createElement('h3');
+    title.className = 'sharkord-modal-title';
+    title.innerText = 'Configurações do App';
+    
+    const text = document.createElement('p');
+    text.className = 'sharkord-modal-text';
+    text.innerText = 'Gerencie as configurações do Sharkord no seu sistema.';
+
+    // Container for toggle
+    const toggleContainer = document.createElement('div');
+    toggleContainer.style.display = 'flex';
+    toggleContainer.style.justifyContent = 'space-between';
+    toggleContainer.style.alignItems = 'center';
+    toggleContainer.style.marginBottom = '24px';
+    toggleContainer.style.padding = '12px';
+    toggleContainer.style.backgroundColor = '#1e1f22';
+    toggleContainer.style.borderRadius = '8px';
+
+    const toggleLabel = document.createElement('span');
+    toggleLabel.innerText = 'Iniciar com o Windows';
+    toggleLabel.style.color = '#dbdee1';
+    toggleLabel.style.fontWeight = '500';
+
+    const toggleWrapper = document.createElement('label');
+    toggleWrapper.className = 'sharkord-toggle-switch';
+
+    const toggleInput = document.createElement('input');
+    toggleInput.type = 'checkbox';
+    toggleInput.checked = isAutoStart;
+
+    const toggleSlider = document.createElement('span');
+    toggleSlider.className = 'sharkord-toggle-slider';
+
+    toggleWrapper.appendChild(toggleInput);
+    toggleWrapper.appendChild(toggleSlider);
+
+    toggleInput.addEventListener('change', async (e) => {
+      const newState = e.target.checked;
+      if (window.electronAPI && window.electronAPI.toggleAutoStart) {
+        const finalState = await window.electronAPI.toggleAutoStart(newState);
+        toggleInput.checked = finalState;
+      }
+    });
+
+    toggleContainer.appendChild(toggleLabel);
+    toggleContainer.appendChild(toggleWrapper);
+
+    const actions = document.createElement('div');
+    actions.className = 'sharkord-modal-actions';
+    
+    const closeBtn = document.createElement('button');
+    closeBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
+    closeBtn.innerText = 'Fechar';
+    closeBtn.onclick = () => document.body.removeChild(overlay);
+    
+    actions.appendChild(closeBtn);
+    
+    modal.appendChild(title);
+    modal.appendChild(text);
+    modal.appendChild(toggleContainer);
+    modal.appendChild(actions);
+    overlay.appendChild(modal);
+    
+    document.body.appendChild(overlay);
+  });
+  document.body.appendChild(settingsBtn);
 
   // Escuta os status do processo (Baixando, Sem att, etc)
   if (window.electronAPI && window.electronAPI.onUpdateStatus) {

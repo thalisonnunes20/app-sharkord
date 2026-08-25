@@ -201,6 +201,28 @@ ipcMain.handle('get-version', () => {
   return app.getVersion();
 });
 
+// Configuração de inicialização com o Windows
+ipcMain.handle('get-auto-start', () => {
+  // Retorna do store para persistir na UI corretamente, pois getLoginItemSettings() pode falhar em modo dev
+  if (store) {
+    return store.get('autoStart') || false;
+  }
+  return app.getLoginItemSettings().openAtLogin;
+});
+
+ipcMain.handle('toggle-auto-start', (event, enable) => {
+  app.setLoginItemSettings({
+    openAtLogin: enable,
+    path: process.execPath
+  });
+  
+  if (store) {
+    store.set('autoStart', enable);
+  }
+  
+  return enable;
+});
+
 // Setup autoUpdater logging
 autoUpdater.on('update-available', () => {
   if (mainWindow) mainWindow.webContents.send('update-status', 'Baixando...');
