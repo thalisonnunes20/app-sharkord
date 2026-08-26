@@ -156,6 +156,19 @@ app.whenReady().then(async () => {
   const Store = StoreModule.default || StoreModule;
   store = new Store();
 
+  // Força o Windows a respeitar a configuração salva
+  try {
+    if (store.has('autoStart')) {
+      const autoStartVal = Boolean(store.get('autoStart'));
+      app.setLoginItemSettings({
+        openAtLogin: autoStartVal,
+        path: process.execPath
+      });
+    }
+  } catch (err) {
+    console.error('Erro ao aplicar autoStart no boot:', err);
+  }
+
   createWindow();
 
   app.on('activate', function () {
@@ -203,24 +216,35 @@ ipcMain.handle('get-version', () => {
 
 // Configuração de inicialização com o Windows
 ipcMain.handle('get-auto-start', () => {
-  // Retorna do store para persistir na UI corretamente, pois getLoginItemSettings() pode falhar em modo dev
   if (store) {
-    return store.get('autoStart') || false;
+    const val = store.get('autoStart') || false;
+    require('fs').appendFileSync(path.join(__dirname, 'debug.txt'), 'Get Auto Start called. Returning from store: ' + val + '\\n');
+    return val;
   }
-  return app.getLoginItemSettings().openAtLogin;
+  const val2 = app.getLoginItemSettings().openAtLogin;
+  require('fs').appendFileSync(path.join(__dirname, 'debug.txt'), 'Get Auto Start called. Store undefined, returning: ' + val2 + '\\n');
+  return val2;
 });
 
 ipcMain.handle('toggle-auto-start', (event, enable) => {
-  app.setLoginItemSettings({
-    openAtLogin: enable,
-    path: process.execPath
-  });
+  require('fs').appendFileSync(path.join(__dirname, 'debug.txt'), 'Toggle Auto Start called: ' + enable + '\\n');
+  const isEnabled = enable === true;
   
   if (store) {
-    store.set('autoStart', enable);
+    store.set('autoStart', isEnabled);
+    require('fs').appendFileSync(path.join(__dirname, 'debug.txt'), 'Store set completed.\\n');
   }
   
-  return enable;
+  try {
+    app.setLoginItemSettings({
+      openAtLogin: isEnabled,
+      path: process.execPath
+    });
+  } catch (err) {
+    console.error('Erro ao definir auto-start:', err);
+  }
+  
+  return isEnabled;
 });
 
 // Setup autoUpdater logging

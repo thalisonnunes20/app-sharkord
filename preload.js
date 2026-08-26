@@ -275,10 +275,17 @@ window.addEventListener('DOMContentLoaded', async () => {
   settingsBtn.innerText = 'Configurações';
 
   settingsBtn.addEventListener('click', async () => {
-    // Busca o status atual
-    let isAutoStart = false;
+    // Busca o status atual salvo no localStorage (para funcionar visualmente no modo dev)
+    let isAutoStart = localStorage.getItem('sharkord_autostart') === 'true';
+    
+    // Tenta sincronizar com o backend
     if (window.electronAPI && window.electronAPI.getAutoStart) {
-      isAutoStart = await window.electronAPI.getAutoStart();
+      try {
+        const backendState = await window.electronAPI.getAutoStart();
+        if (backendState !== undefined && backendState !== null) {
+          isAutoStart = backendState;
+        }
+      } catch(err) {}
     }
 
     const overlay = document.createElement('div');
@@ -323,12 +330,11 @@ window.addEventListener('DOMContentLoaded', async () => {
     toggleWrapper.appendChild(toggleInput);
     toggleWrapper.appendChild(toggleSlider);
 
-    toggleInput.addEventListener('change', async (e) => {
-      const newState = e.target.checked;
-      if (window.electronAPI && window.electronAPI.toggleAutoStart) {
-        const finalState = await window.electronAPI.toggleAutoStart(newState);
-        toggleInput.checked = finalState;
-      }
+    // Controle explícito do clique para evitar bugs do navegador com labels
+    toggleWrapper.addEventListener('click', (e) => {
+      e.preventDefault(); // Evita que o clique dispare o checkbox nativamente 2 vezes
+      isAutoStart = !isAutoStart;
+      toggleInput.checked = isAutoStart;
     });
 
     toggleContainer.appendChild(toggleLabel);
@@ -337,12 +343,33 @@ window.addEventListener('DOMContentLoaded', async () => {
     const actions = document.createElement('div');
     actions.className = 'sharkord-modal-actions';
     
-    const closeBtn = document.createElement('button');
-    closeBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
-    closeBtn.innerText = 'Fechar';
-    closeBtn.onclick = () => document.body.removeChild(overlay);
+    const cancelBtn = document.createElement('button');
+    cancelBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
+    cancelBtn.innerText = 'Cancelar';
+    cancelBtn.onclick = () => document.body.removeChild(overlay);
     
-    actions.appendChild(closeBtn);
+    const saveBtn = document.createElement('button');
+    saveBtn.className = 'sharkord-modal-btn';
+    saveBtn.style.backgroundColor = '#5865F2';
+    saveBtn.style.color = 'white';
+    saveBtn.innerText = 'Salvar';
+    saveBtn.onclick = async () => {
+      saveBtn.innerText = 'Salvando...';
+      saveBtn.disabled = true;
+      try {
+        if (window.electronAPI && window.electronAPI.toggleAutoStart) {
+          await window.electronAPI.toggleAutoStart(isAutoStart);
+        }
+        // Salva localmente para a interface lembrar (já que o Windows não retorna status em modo Dev)
+        localStorage.setItem('sharkord_autostart', isAutoStart);
+      } catch (err) {
+        alert('Erro ao salvar: ' + (err.message || err));
+      }
+      document.body.removeChild(overlay);
+    };
+    
+    actions.appendChild(cancelBtn);
+    actions.appendChild(saveBtn);
     
     modal.appendChild(title);
     modal.appendChild(text);
