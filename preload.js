@@ -269,6 +269,18 @@ window.addEventListener('DOMContentLoaded', async () => {
   
   document.body.appendChild(updateBtn);
 
+  // Verifica ao carregar a página se já tem atualização baixada
+  ipcRenderer.invoke('is-update-ready').then(ready => {
+    if (ready) {
+      isUpdateReady = true;
+      updateBtn.innerText = 'Atualização Pronta';
+      updateBtn.style.backgroundColor = '#23a559';
+      updateBtn.style.transform = 'translateX(0)';
+      updateBtn.style.opacity = '1';
+    }
+  }).catch(() => {});
+
+
   // Criação do botão de configurações
   const settingsBtn = document.createElement('button');
   settingsBtn.className = 'sharkord-settings-btn';
@@ -379,10 +391,6 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   // Escuta os status do processo (Baixando, Sem att, etc)
   ipcRenderer.on('update-status', (event, status) => {
-    // Abre a janela sozinho se estiver baixando ou pronto
-    if (!updateModalOverlay && status !== 'Sem atualizações' && !status.startsWith('Erro')) {
-      updateBtn.click();
-    }
 
     if (updateModalText && updateModalActionBtn) {
       updateModalText.innerText = status;

@@ -134,6 +134,10 @@ ipcMain.on('manual-check-update', () => {
   checkCustomGitHubUpdate();
 });
 
+ipcMain.handle('is-update-ready', () => {
+  return downloadedExePath && fs.existsSync(downloadedExePath);
+});
+
 function createWindow() {
   mainWindow = new BrowserWindow({
     width: 1200,
