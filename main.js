@@ -1,13 +1,133 @@
 const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, shell } = require('electron');
-const { autoUpdater } = require('electron-updater');
+const https = require('https');
+const fs = require('fs');
 const path = require('path');
+const { spawn } = require('child_process');
 
-let store;
+let downloadedExePath = null;
 
-let mainWindow;
+function compareVersions(v1, v2) {
+  const cleanV1 = (v1 || '').replace(/^v/, '').trim();
+  const cleanV2 = (v2 || '').replace(/^v/, '').trim();
+  const parts1 = cleanV1.split('.').map(Number);
+  const parts2 = cleanV2.split('.').map(Number);
+  for (let i = 0; i < Math.max(parts1.length, parts2.length); i++) {
+    const val1 = parts1[i] || 0;
+    const val2 = parts2[i] || 0;
+    if (val1 > val2) return 1;
+    if (val1 < val2) return -1;
+  }
+  return 0;
+}
 
-// Fix para lentidão da câmera no Windows
-app.commandLine.appendSwitch('disable-features', 'MediaFoundationVideoCapture');
+function checkCustomGitHubUpdate() {
+  if (mainWindow) mainWindow.webContents.send('update-status', 'Buscando...');
+  
+  const options = {
+    hostname: 'api.github.com',
+    path: '/repos/thalisonnunes20/app-sharkord/releases/latest',
+    headers: { 'User-Agent': 'Sharkord-App-Updater' }
+  };
+
+  const req = https.get(options, (res) => {
+    if (res.statusCode === 301 || res.statusCode === 302) {
+      https.get(res.headers.location, { headers: { 'User-Agent': 'Sharkord-App-Updater' } }, parseReleaseResponse);
+      return;
+    }
+    parseReleaseResponse(res);
+  });
+
+  req.on('error', (err) => {
+    if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + (err.message || err));
+  });
+}
+
+function parseReleaseResponse(res) {
+  let data = '';
+  res.on('data', chunk => data += chunk);
+  res.on('end', () => {
+    try {
+      if (res.statusCode !== 200) {
+        if (mainWindow) mainWindow.webContents.send('update-status', 'Erro no GitHub: HTTP ' + res.statusCode);
+        return;
+      }
+      const release = JSON.parse(data);
+      const latestVersion = release.tag_name || release.name || '';
+      const currentVersion = app.getVersion();
+
+      if (compareVersions(latestVersion, currentVersion) > 0) {
+        const exeAsset = (release.assets || []).find(a => a.name && a.name.endsWith('.exe'));
+        if (!exeAsset) {
+          if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: Executável não encontrado na release');
+          return;
+        }
+        downloadUpdateFile(exeAsset.browser_download_url, exeAsset.name);
+      } else {
+        if (mainWindow) mainWindow.webContents.send('update-status', 'Sem atualizações');
+      }
+    } catch (err) {
+      if (mainWindow) mainWindow.webContents.send('update-status', 'Erro ao ler dados: ' + err.message);
+    }
+  });
+}
+
+function downloadUpdateFile(fileUrl, fileName) {
+  if (mainWindow) mainWindow.webContents.send('update-status', 'Baixando');
+  
+  const tempPath = path.join(app.getPath('temp'), fileName);
+  downloadedExePath = tempPath;
+
+  const downloadRequest = (url) => {
+    https.get(url, { headers: { 'User-Agent': 'Sharkord-App-Updater' } }, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        downloadRequest(res.headers.location);
+        return;
+      }
+
+      if (res.statusCode !== 200) {
+        if (mainWindow) mainWindow.webContents.send('update-status', 'Erro no download: HTTP ' + res.statusCode);
+        return;
+      }
+
+      const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
+      let downloadedBytes = 0;
+      const fileStream = fs.createWriteStream(tempPath);
+
+      res.on('data', (chunk) => {
+        downloadedBytes += chunk.length;
+        fileStream.write(chunk);
+        if (totalBytes > 0) {
+          const percent = Math.round((downloadedBytes / totalBytes) * 100);
+          if (mainWindow) mainWindow.webContents.send('update-status', `Baixando: ${percent}%`);
+        }
+      });
+
+      res.on('end', () => {
+        fileStream.end();
+        if (mainWindow) {
+          mainWindow.webContents.send('update-ready');
+          mainWindow.webContents.send('update-status', 'Pronto!');
+        }
+      });
+    }).on('error', (err) => {
+      if (mainWindow) mainWindow.webContents.send('update-status', 'Erro no download: ' + err.message);
+    });
+  };
+
+  downloadRequest(fileUrl);
+}
+
+// IPC Handlers para atualização
+ipcMain.on('install-update', () => {
+  if (downloadedExePath && fs.existsSync(downloadedExePath)) {
+    spawn(downloadedExePath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
+    app.quit();
+  }
+});
+
+ipcMain.on('manual-check-update', () => {
+  checkCustomGitHubUpdate();
+});
 
 function createWindow() {
   mainWindow = new BrowserWindow({
@@ -25,58 +145,7 @@ function createWindow() {
 
   mainWindow.once('ready-to-show', () => {
     mainWindow.show();
-    // Check for updates once the window is shown
-    autoUpdater.checkForUpdates().catch(err => {
-      console.log('Update check ignored/failed (likely dev mode):', err.message);
-    });
-  });
-
-  autoUpdater.on('checking-for-update', () => {
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Buscando...');
-  });
-
-  autoUpdater.on('update-available', (info) => {
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Baixando');
-  });
-
-  autoUpdater.on('update-not-available', () => {
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Sem atualizações');
-  });
-
-  autoUpdater.on('download-progress', (progressObj) => {
-    let percent = Math.round(progressObj.percent);
-    if (mainWindow) mainWindow.webContents.send('update-status', `Baixando: ${percent}%`);
-  });
-
-  autoUpdater.on('update-downloaded', () => {
-    if (mainWindow) mainWindow.webContents.send('update-ready');
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Pronto!');
-  });
-
-  autoUpdater.on('error', (err) => {
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + (err.message || err));
-  });
-
-  // Handle install command from UI
-  ipcMain.on('install-update', () => {
-    // Instalacao totalmente silenciosa (isSilent = true) e reinicia o app no final (isForceRunAfter = true)
-    autoUpdater.quitAndInstall(true, true);
-  });
-
-  // Handle manual check command from UI
-  ipcMain.on('manual-check-update', () => {
-    try {
-      autoUpdater.checkForUpdates().then(result => {
-        if (result === null) {
-          if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: Não foi possível checar (Modo dev?)');
-        }
-      }).catch(err => {
-        console.error('Erro na busca manual:', err);
-        if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + (err.message || err));
-      });
-    } catch (err) {
-      if (mainWindow) mainWindow.webContents.send('update-status', 'Erro fatal: ' + err.message);
-    }
+    checkCustomGitHubUpdate();
   });
 
   // Força o Electron a ignorar eventos que impedem o descarregamento da página (como streams ativos)
@@ -268,21 +337,4 @@ ipcMain.handle('toggle-auto-start', (event, enable) => {
   return isEnabled;
 });
 
-// Setup autoUpdater logging
-autoUpdater.on('update-available', () => {
-  if (mainWindow) mainWindow.webContents.send('update-status', 'Baixando...');
-});
-autoUpdater.on('update-not-available', () => {
-  if (mainWindow) mainWindow.webContents.send('update-status', 'Sem atualizações');
-});
-autoUpdater.on('download-progress', (progressObj) => {
-  const percent = Math.round(progressObj.percent);
-  if (mainWindow) mainWindow.webContents.send('update-status', `Baixando... ${percent}%`);
-});
-autoUpdater.on('error', (err) => {
-  const msg = err == null ? 'Erro desconhecido' : (err.message || err);
-  if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + msg);
-});
-autoUpdater.on('update-downloaded', () => {
-  if (mainWindow) mainWindow.webContents.send('update-status', 'Pronto!');
-});
+
