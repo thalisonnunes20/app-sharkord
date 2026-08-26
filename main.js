@@ -42,25 +42,30 @@ function createWindow() {
     });
   });
 
-  autoUpdater.on('update-available', () => {
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Atualização encontrada! Baixando...');
+  autoUpdater.on('checking-for-update', () => {
+    if (mainWindow) mainWindow.webContents.send('update-status', 'Buscando...');
+  });
+
+  autoUpdater.on('update-available', (info) => {
+    if (mainWindow) mainWindow.webContents.send('update-status', 'Baixando');
   });
 
   autoUpdater.on('update-not-available', () => {
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Você já está na versão mais recente!');
+    if (mainWindow) mainWindow.webContents.send('update-status', 'Sem atualizações');
   });
 
   autoUpdater.on('download-progress', (progressObj) => {
     let percent = Math.round(progressObj.percent);
-    if (mainWindow) mainWindow.webContents.send('update-status', `Baixando atualização: ${percent}%`);
+    if (mainWindow) mainWindow.webContents.send('update-status', `Baixando: ${percent}%`);
   });
 
   autoUpdater.on('update-downloaded', () => {
     if (mainWindow) mainWindow.webContents.send('update-ready');
+    if (mainWindow) mainWindow.webContents.send('update-status', 'Pronto!');
   });
 
   autoUpdater.on('error', (err) => {
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Erro no update: ' + err.message);
+    if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + (err.message || err));
   });
 
   // Handle install command from UI
