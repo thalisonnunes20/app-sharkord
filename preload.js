@@ -245,7 +245,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       updateModalActionBtn.style.backgroundColor = '#23a559';
       updateModalActionBtn.style.color = 'white';
       updateModalActionBtn.innerText = 'Instalar Agora';
-      updateModalActionBtn.onclick = () => window.electronAPI.installUpdate();
+      updateModalActionBtn.onclick = () => ipcRenderer.send('install-update');
     } else {
       updateModalActionBtn.style.backgroundColor = '#5865F2';
       updateModalActionBtn.style.color = 'white';
@@ -254,7 +254,7 @@ window.addEventListener('DOMContentLoaded', async () => {
         updateModalActionBtn.innerText = 'Buscando...';
         updateModalActionBtn.disabled = true;
         updateModalText.innerText = 'Procurando atualizações no servidor. Aguarde...';
-        window.electronAPI.manualCheckUpdate();
+        ipcRenderer.send('manual-check-update');
       };
     }
     actions.appendChild(updateModalActionBtn);
@@ -279,14 +279,12 @@ window.addEventListener('DOMContentLoaded', async () => {
     let isAutoStart = localStorage.getItem('sharkord_autostart') === 'true';
     
     // Tenta sincronizar com o backend
-    if (window.electronAPI && window.electronAPI.getAutoStart) {
-      try {
-        const backendState = await window.electronAPI.getAutoStart();
-        if (backendState !== undefined && backendState !== null) {
-          isAutoStart = backendState;
-        }
-      } catch(err) {}
-    }
+    try {
+      const backendState = await ipcRenderer.invoke('get-auto-start');
+      if (backendState !== undefined && backendState !== null) {
+        isAutoStart = backendState;
+      }
+    } catch(err) {}
 
     const overlay = document.createElement('div');
     overlay.className = 'sharkord-modal-overlay';
@@ -357,9 +355,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       saveBtn.innerText = 'Salvando...';
       saveBtn.disabled = true;
       try {
-        if (window.electronAPI && window.electronAPI.toggleAutoStart) {
-          await window.electronAPI.toggleAutoStart(isAutoStart);
-        }
+        await ipcRenderer.invoke('toggle-auto-start', isAutoStart);
         // Salva localmente para a interface lembrar (já que o Windows não retorna status em modo Dev)
         localStorage.setItem('sharkord_autostart', isAutoStart);
       } catch (err) {
@@ -382,56 +378,52 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.body.appendChild(settingsBtn);
 
   // Escuta os status do processo (Baixando, Sem att, etc)
-  if (window.electronAPI && window.electronAPI.onUpdateStatus) {
-    window.electronAPI.onUpdateStatus((event, status) => {
-      // Abre a janela sozinho se estiver baixando ou pronto
-      if (!updateModalOverlay && status !== 'Sem atualizações' && !status.startsWith('Erro')) {
-        updateBtn.click();
-      }
+  ipcRenderer.on('update-status', (event, status) => {
+    // Abre a janela sozinho se estiver baixando ou pronto
+    if (!updateModalOverlay && status !== 'Sem atualizações' && !status.startsWith('Erro')) {
+      updateBtn.click();
+    }
 
-      if (updateModalText && updateModalActionBtn) {
+    if (updateModalText && updateModalActionBtn) {
+      updateModalText.innerText = status;
+      if (status.startsWith('Baixando')) {
+        updateModalActionBtn.innerText = 'Aguarde...';
+        updateModalActionBtn.disabled = true;
+        updateModalActionBtn.style.backgroundColor = '#5865F2';
+      } else if (status === 'Sem atualizações') {
+        updateModalText.innerText = 'Você já está na versão mais recente!';
+        updateModalActionBtn.innerText = 'OK';
+        updateModalActionBtn.disabled = false;
+        updateModalActionBtn.onclick = () => {
+          document.body.removeChild(updateModalOverlay);
+          updateModalOverlay = null;
+        };
+      } else if (status.startsWith('Erro')) {
         updateModalText.innerText = status;
-        if (status.startsWith('Baixando')) {
-          updateModalActionBtn.innerText = 'Aguarde...';
-          updateModalActionBtn.disabled = true;
-          updateModalActionBtn.style.backgroundColor = '#5865F2';
-        } else if (status === 'Sem atualizações') {
-          updateModalText.innerText = 'Você já está na versão mais recente!';
-          updateModalActionBtn.innerText = 'OK';
-          updateModalActionBtn.disabled = false;
-          updateModalActionBtn.onclick = () => {
-            document.body.removeChild(updateModalOverlay);
-            updateModalOverlay = null;
-          };
-        } else if (status.startsWith('Erro')) {
-          updateModalText.innerText = status;
-          updateModalActionBtn.innerText = 'OK';
-          updateModalActionBtn.disabled = false;
-          updateModalActionBtn.onclick = () => {
-            document.body.removeChild(updateModalOverlay);
-            updateModalOverlay = null;
-          };
-        } else if (status === 'Pronto!') {
-          isUpdateReady = true;
-          updateModalText.innerText = 'Download concluído! Instalar agora?';
-          updateModalActionBtn.innerText = 'Instalar Agora';
-          updateModalActionBtn.style.backgroundColor = '#23a559';
-          updateModalActionBtn.disabled = false;
-          updateModalActionBtn.onclick = () => window.electronAPI.installUpdate();
-        }
+        updateModalActionBtn.innerText = 'OK';
+        updateModalActionBtn.disabled = false;
+        updateModalActionBtn.onclick = () => {
+          document.body.removeChild(updateModalOverlay);
+          updateModalOverlay = null;
+        };
+      } else if (status === 'Pronto!') {
+        isUpdateReady = true;
+        updateModalText.innerText = 'Download concluído! Instalar agora?';
+        updateModalActionBtn.innerText = 'Instalar Agora';
+        updateModalActionBtn.style.backgroundColor = '#23a559';
+        updateModalActionBtn.disabled = false;
+        updateModalActionBtn.onclick = () => ipcRenderer.send('install-update');
       }
-    });
-  }
+    }
+  });
 
   // Escuta se há atualizações prontas para instalar em segundo plano
-  if (window.electronAPI && window.electronAPI.onUpdateReady) {
-    window.electronAPI.onUpdateReady(() => {
-      isUpdateReady = true;
-      updateBtn.innerText = 'Atualização Pronta';
-      updateBtn.style.backgroundColor = '#f59e0b';
-      updateBtn.style.transform = 'translateX(0)';
-    });
-  }
+  ipcRenderer.on('update-ready', () => {
+    isUpdateReady = true;
+    updateBtn.innerText = 'Atualização Pronta';
+    updateBtn.style.backgroundColor = '#23a559';
+    updateBtn.style.transform = 'translateX(0)';
+  });
 });
 
 // UI do Seletor Visual de Telas

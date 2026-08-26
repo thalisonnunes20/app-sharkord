@@ -1,10 +1,15 @@
 const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, shell } = require('electron');
-const https = require('https');
+const { https } = require('follow-redirects');
 const fs = require('fs');
 const path = require('path');
 const { spawn } = require('child_process');
 
+let store;
+let mainWindow;
 let downloadedExePath = null;
+
+// Fix para lentidão da câmera no Windows
+app.commandLine.appendSwitch('disable-features', 'MediaFoundationVideoCapture');
 
 function compareVersions(v1, v2) {
   const cleanV1 = (v1 || '').replace(/^v/, '').trim();
@@ -56,7 +61,7 @@ function parseReleaseResponse(res) {
       const currentVersion = app.getVersion();
 
       if (compareVersions(latestVersion, currentVersion) > 0) {
-        const exeAsset = (release.assets || []).find(a => a.name && a.name.endsWith('.exe'));
+        const exeAsset = (release.assets || []).find(a => a.name && a.name.endsWith('.exe') && !a.name.endsWith('.blockmap'));
         if (!exeAsset) {
           if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: Executável não encontrado na release');
           return;
@@ -120,7 +125,7 @@ function downloadUpdateFile(fileUrl, fileName) {
 // IPC Handlers para atualização
 ipcMain.on('install-update', () => {
   if (downloadedExePath && fs.existsSync(downloadedExePath)) {
-    spawn(downloadedExePath, ['/S'], { detached: true, stdio: 'ignore' }).unref();
+    spawn(downloadedExePath, ['/S', '--force-run'], { detached: true, stdio: 'ignore' }).unref();
     app.quit();
   }
 });
@@ -307,22 +312,16 @@ ipcMain.handle('get-version', () => {
 // Configuração de inicialização com o Windows
 ipcMain.handle('get-auto-start', () => {
   if (store) {
-    const val = store.get('autoStart') || false;
-    require('fs').appendFileSync(path.join(__dirname, 'debug.txt'), 'Get Auto Start called. Returning from store: ' + val + '\\n');
-    return val;
+    return store.get('autoStart') || false;
   }
-  const val2 = app.getLoginItemSettings().openAtLogin;
-  require('fs').appendFileSync(path.join(__dirname, 'debug.txt'), 'Get Auto Start called. Store undefined, returning: ' + val2 + '\\n');
-  return val2;
+  return app.getLoginItemSettings().openAtLogin;
 });
 
 ipcMain.handle('toggle-auto-start', (event, enable) => {
-  require('fs').appendFileSync(path.join(__dirname, 'debug.txt'), 'Toggle Auto Start called: ' + enable + '\\n');
   const isEnabled = enable === true;
   
   if (store) {
     store.set('autoStart', isEnabled);
-    require('fs').appendFileSync(path.join(__dirname, 'debug.txt'), 'Store set completed.\\n');
   }
   
   try {
