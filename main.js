@@ -2,6 +2,17 @@ const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, shell } = r
 const { autoUpdater } = require('electron-updater');
 const path = require('path');
 
+// Configura o feed do GitHub explicitamente no autoUpdater
+try {
+  autoUpdater.setFeedURL({
+    provider: 'github',
+    owner: 'thalisonnunes20',
+    repo: 'app-sharkord'
+  });
+} catch (e) {
+  console.error('Erro ao configurar feedURL:', e);
+}
+
 let store;
 
 let mainWindow;
