@@ -391,7 +391,7 @@ window.addEventListener('DOMContentLoaded', async () => {
 
       if (updateModalText && updateModalActionBtn) {
         updateModalText.innerText = status;
-        if (status.startsWith('Baixando...')) {
+        if (status.startsWith('Baixando')) {
           updateModalActionBtn.innerText = 'Aguarde...';
           updateModalActionBtn.disabled = true;
           updateModalActionBtn.style.backgroundColor = '#5865F2';
