@@ -340,4 +340,19 @@ ipcMain.handle('toggle-auto-start', (event, enable) => {
   return isEnabled;
 });
 
+// Language support
+ipcMain.handle('get-language', () => {
+  if (store) {
+    return store.get('language') || 'pt-BR';
+  }
+  return 'pt-BR';
+});
 
+ipcMain.on('set-language', (event, lang) => {
+  if (store) {
+    store.set('language', lang);
+  }
+  if (mainWindow) {
+    mainWindow.webContents.send('language-changed', lang);
+  }
+});

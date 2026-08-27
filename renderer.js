@@ -1,3 +1,29 @@
+let currentLang = 'pt-BR';
+let t = (key) => key;
+
+document.addEventListener('DOMContentLoaded', async () => {
+  if (window.electronAPI && window.electronAPI.getLanguage && window.sharkordI18n) {
+    currentLang = await window.electronAPI.getLanguage();
+    t = (key) => window.sharkordI18n[currentLang][key] || window.sharkordI18n['pt-BR'][key] || key;
+    
+    // Process data-i18n attributes
+    document.querySelectorAll('[data-i18n]').forEach(el => {
+      const key = el.getAttribute('data-i18n');
+      if (key) el.innerText = t(key);
+    });
+    
+    document.querySelectorAll('[data-i18n-html]').forEach(el => {
+      const key = el.getAttribute('data-i18n-html');
+      if (key) el.innerHTML = t(key);
+    });
+    
+    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+      const key = el.getAttribute('data-i18n-placeholder');
+      if (key) el.setAttribute('placeholder', t(key));
+    });
+  }
+});
+
 document.getElementById('setup-form').addEventListener('submit', (e) => {
   e.preventDefault();
   
@@ -23,7 +49,7 @@ document.getElementById('setup-form').addEventListener('submit', (e) => {
     
     // Change button text to show loading
     const submitBtn = document.querySelector('.submit-btn');
-    submitBtn.innerText = 'Conectando...';
+    submitBtn.innerText = t('btnConnecting');
     submitBtn.disabled = true;
 
     // Send to main process
@@ -31,9 +57,9 @@ document.getElementById('setup-form').addEventListener('submit', (e) => {
     
   } catch (err) {
     if (err.message === 'O domínio deve iniciar com sharkord.') {
-      errorMessage.innerText = 'O domínio deve iniciar com sharkord.';
+      errorMessage.innerText = t('errorDomain');
     } else {
-      errorMessage.innerText = 'Por favor, insira uma URL válida.';
+      errorMessage.innerText = t('errorInvalidUrl');
     }
     errorMessage.style.display = 'block';
   }
@@ -44,10 +70,10 @@ if (window.electronAPI && window.electronAPI.onConnectionError) {
     const errorMessage = document.getElementById('error-message');
     const submitBtn = document.querySelector('.submit-btn');
     
-    errorMessage.innerText = 'Falha ao conectar ao servidor. Verifique a URL e tente novamente.';
+    errorMessage.innerText = t('errorConn');
     errorMessage.style.display = 'block';
     
-    submitBtn.innerText = 'Conectar';
+    submitBtn.innerText = t('btnConnect');
     submitBtn.disabled = false;
   });
 }

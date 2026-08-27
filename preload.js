@@ -10,11 +10,111 @@ contextBridge.exposeInMainWorld('electronAPI', {
   onUpdateStatus: (callback) => ipcRenderer.on('update-status', callback),
   onConnectionError: (callback) => ipcRenderer.on('connection-error', callback),
   getAutoStart: () => ipcRenderer.invoke('get-auto-start'),
-  toggleAutoStart: (enable) => ipcRenderer.invoke('toggle-auto-start', enable)
+  toggleAutoStart: (enable) => ipcRenderer.invoke('toggle-auto-start', enable),
+  getLanguage: () => ipcRenderer.invoke('get-language'),
+  setLanguage: (lang) => ipcRenderer.send('set-language', lang),
+  onLanguageChanged: (callback) => ipcRenderer.on('language-changed', (e, lang) => callback(lang))
 });
+
+const translations = {
+  'pt-BR': {
+    welcomeTitle: 'Boas-vindas de volta!',
+    welcomeDesc: 'Estamos muito animados em ver você novamente.',
+    serverUrlLabel: 'URL do Servidor Sharkord <span class="text-[#fa777c]">*</span>',
+    serverUrlPlaceholder: 'https://seu-servidor.com',
+    errorInvalidUrl: 'Por favor, insira uma URL válida.',
+    errorDomain: 'O domínio deve iniciar com sharkord.',
+    urlHint: 'O endereço deve pertencer a um servidor válido e começar com o subdomínio <span class="text-white font-semibold">sharkord.</span> (ex: https://sharkord.dominio.com).',
+    btnEnter: 'Entrar',
+    btnConnecting: 'Conectando...',
+    recentServers: 'Acessados Recentemente',
+    helpPlatform: 'Problemas com a plataforma?',
+    helpPlatformLink: 'Acesse o repositório oficial do Sharkord.',
+    helpApp: 'Dúvidas sobre este App para Windows?',
+    helpAppLink: 'Acesse o nosso repositório.',
+    btnLeave: 'Sair do Servidor',
+    btnUpdate: 'Verificar Atualizações',
+    btnSettings: 'Configurações',
+    modalLeaveTitle: 'Desconectar do Servidor',
+    modalLeaveDesc: 'Tem certeza que deseja desconectar? Você precisará digitar a URL novamente caso queira voltar.<br><br><span class="sharkord-modal-warning">Nota:</span> Se houver transmissões ativas (Tela/Câmera), elas serão encerradas forçadamente ao sair.',
+    modalLeaveConfirm: 'Sair e Desconectar',
+    modalUpdateTitle: 'Central de Atualizações',
+    modalUpdateReadyDesc: 'Uma nova atualização já foi baixada e está pronta.<br><br>O aplicativo será fechado para instalar a atualização agora.',
+    modalUpdateSearchDesc: 'Deseja buscar por novas versões no servidor?',
+    btnInstallNow: 'Instalar Agora',
+    btnSearchUpdates: 'Buscar Atualizações',
+    btnSearching: 'Buscando...',
+    modalSettingsTitle: 'Configurações do App',
+    modalSettingsDesc: 'Gerencie as configurações do Sharkord no seu sistema.',
+    settingAutoStart: 'Iniciar com o Windows',
+    settingLanguage: 'Idioma / Language',
+    btnCancel: 'Cancelar',
+    btnClose: 'Fechar',
+    btnSave: 'Salvar',
+    btnSaving: 'Salvando...',
+    updateStatusReady: 'Atualização Pronta',
+    updateStatusSearching: 'Procurando atualizações no servidor. Aguarde...',
+    updateStatusWait: 'Aguarde...',
+    updateStatusNoUpdatesTitle: 'Você já está na versão mais recente!',
+    updateStatusOk: 'OK',
+    updateStatusReadyTitle: 'Download concluído! Instalar agora?',
+    errorConn: 'Falha ao conectar ao servidor. Verifique a URL e tente novamente.',
+    btnConnect: 'Conectar',
+    screenPickerTitle: 'Escolha o que compartilhar'
+  },
+  'en-US': {
+    welcomeTitle: 'Welcome back!',
+    welcomeDesc: 'We are very excited to see you again.',
+    serverUrlLabel: 'Sharkord Server URL <span class="text-[#fa777c]">*</span>',
+    serverUrlPlaceholder: 'https://your-server.com',
+    errorInvalidUrl: 'Please enter a valid URL.',
+    errorDomain: 'The domain must start with sharkord.',
+    urlHint: 'The address must belong to a valid server and start with the subdomain <span class="text-white font-semibold">sharkord.</span> (e.g. https://sharkord.domain.com).',
+    btnEnter: 'Enter',
+    btnConnecting: 'Connecting...',
+    recentServers: 'Recently Accessed',
+    helpPlatform: 'Problems with the platform?',
+    helpPlatformLink: 'Access the official Sharkord repository.',
+    helpApp: 'Questions about this Windows App?',
+    helpAppLink: 'Access our repository.',
+    btnLeave: 'Leave Server',
+    btnUpdate: 'Check for Updates',
+    btnSettings: 'Settings',
+    modalLeaveTitle: 'Disconnect from Server',
+    modalLeaveDesc: 'Are you sure you want to disconnect? You will need to enter the URL again if you want to return.<br><br><span class="sharkord-modal-warning">Note:</span> If there are active streams (Screen/Camera), they will be forcibly closed upon leaving.',
+    modalLeaveConfirm: 'Leave and Disconnect',
+    modalUpdateTitle: 'Update Center',
+    modalUpdateReadyDesc: 'A new update has already been downloaded and is ready.<br><br>The application will be closed to install the update now.',
+    modalUpdateSearchDesc: 'Do you want to check for new versions on the server?',
+    btnInstallNow: 'Install Now',
+    btnSearchUpdates: 'Check for Updates',
+    btnSearching: 'Searching...',
+    modalSettingsTitle: 'App Settings',
+    modalSettingsDesc: 'Manage your Sharkord settings on your system.',
+    settingAutoStart: 'Start with Windows',
+    settingLanguage: 'Language / Idioma',
+    btnCancel: 'Cancel',
+    btnClose: 'Close',
+    btnSave: 'Save',
+    btnSaving: 'Saving...',
+    updateStatusReady: 'Update Ready',
+    updateStatusSearching: 'Searching for updates on the server. Please wait...',
+    updateStatusWait: 'Wait...',
+    updateStatusNoUpdatesTitle: 'You are already on the latest version!',
+    updateStatusOk: 'OK',
+    updateStatusReadyTitle: 'Download complete! Install now?',
+    errorConn: 'Failed to connect to the server. Check the URL and try again.',
+    btnConnect: 'Connect',
+    screenPickerTitle: 'Choose what to share'
+  }
+};
+
+contextBridge.exposeInMainWorld('sharkordI18n', translations);
+
 
 // Injeta lógica de atualização e botão flutuante na página web do Sharkord
 window.addEventListener('DOMContentLoaded', async () => {
+  try {
   // Configura a versão da tela inicial se ela existir
   const versionEl = document.getElementById('app-version');
   if (versionEl && window.electronAPI && window.electronAPI.getVersion) {
@@ -141,14 +241,30 @@ window.addEventListener('DOMContentLoaded', async () => {
       .sharkord-modal-btn-cancel:hover { text-decoration: underline; }
       .sharkord-modal-btn-confirm { background-color: #da373c; color: white; }
       .sharkord-modal-btn-confirm:hover { background-color: #a12828; }
+      .sharkord-lang-btn {
+        background: none; border: none; cursor: pointer; padding: 4px; border-radius: 4px; transition: background-color 0.2s;
+        display: flex; align-items: center; justify-content: center; opacity: 0.5;
+      }
+      .sharkord-lang-btn:hover { background-color: #3f4147; }
+      .sharkord-lang-btn.active { opacity: 1; background-color: #3f4147; }
     `;
     document.head.appendChild(style);
+
+  let currentLang = 'pt-BR';
+  try {
+    currentLang = await ipcRenderer.invoke('get-language');
+  } catch(e) {}
+  
+  function t(key) {
+    return translations[currentLang][key] || translations['pt-BR'][key] || key;
+  }
+
 
   // Se estivermos dentro do servidor Sharkord, injetamos o botão de Sair
   if (window.location.protocol.startsWith('http')) {
     const btn = document.createElement('button');
     btn.className = 'sharkord-disconnect-btn';
-    btn.innerText = 'Sair do Servidor';
+    btn.innerText = t('btnLeave');
     
     btn.addEventListener('click', () => {
       const overlay = document.createElement('div');
@@ -159,23 +275,23 @@ window.addEventListener('DOMContentLoaded', async () => {
       
       const title = document.createElement('h3');
       title.className = 'sharkord-modal-title';
-      title.innerText = 'Desconectar do Servidor';
+      title.innerText = t('modalLeaveTitle');
       
       const text = document.createElement('p');
       text.className = 'sharkord-modal-text';
-      text.innerHTML = 'Tem certeza que deseja desconectar? Você precisará digitar a URL novamente caso queira voltar.<br><br><span class="sharkord-modal-warning">Nota:</span> Se houver transmissões ativas (Tela/Câmera), elas serão encerradas forçadamente ao sair.';
+      text.innerHTML = t('modalLeaveDesc');
       
       const actions = document.createElement('div');
       actions.className = 'sharkord-modal-actions';
       
       const cancelBtn = document.createElement('button');
       cancelBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
-      cancelBtn.innerText = 'Cancelar';
+      cancelBtn.innerText = t('btnCancel');
       cancelBtn.onclick = () => document.body.removeChild(overlay);
       
       const confirmBtn = document.createElement('button');
       confirmBtn.className = 'sharkord-modal-btn sharkord-modal-btn-confirm';
-      confirmBtn.innerText = 'Sair e Desconectar';
+      confirmBtn.innerText = t('modalLeaveConfirm');
       confirmBtn.onclick = () => {
         ipcRenderer.send('clear-server-url');
       };
@@ -197,13 +313,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Criação do botão manual de atualização visível (mesmo fora do servidor)
   const updateBtn = document.createElement('button');
   updateBtn.className = 'sharkord-update-btn';
-  updateBtn.innerText = 'Verificar Atualizações';
+  updateBtn.innerText = t('btnUpdate');
   
   // Status de update pronto
   let isUpdateReady = false;
   let updateModalOverlay = null;
   let updateModalText = null;
   let updateModalActionBtn = null;
+  let updateModalCancelBtn = null;
 
   updateBtn.addEventListener('click', () => {
     // Cria o overlay do pop-up
@@ -215,28 +332,28 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     const title = document.createElement('h3');
     title.className = 'sharkord-modal-title';
-    title.innerText = 'Central de Atualizações';
+    title.innerText = t('modalUpdateTitle');
     
     updateModalText = document.createElement('p');
     updateModalText.className = 'sharkord-modal-text';
     
     if (isUpdateReady) {
-      updateModalText.innerHTML = 'Uma nova atualização já foi baixada e está pronta.<br><br>O aplicativo será fechado para instalar a atualização agora.';
+      updateModalText.innerHTML = t('modalUpdateReadyDesc');
     } else {
-      updateModalText.innerText = 'Deseja buscar por novas versões no servidor?';
+      updateModalText.innerText = t('modalUpdateSearchDesc');
     }
 
     const actions = document.createElement('div');
     actions.className = 'sharkord-modal-actions';
     
-    const cancelBtn = document.createElement('button');
-    cancelBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
-    cancelBtn.innerText = 'Fechar';
-    cancelBtn.onclick = () => {
+    updateModalCancelBtn = document.createElement('button');
+    updateModalCancelBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
+    updateModalCancelBtn.innerText = t('btnClose');
+    updateModalCancelBtn.onclick = () => {
       document.body.removeChild(updateModalOverlay);
       updateModalOverlay = null;
     };
-    actions.appendChild(cancelBtn);
+    actions.appendChild(updateModalCancelBtn);
     
     updateModalActionBtn = document.createElement('button');
     updateModalActionBtn.className = 'sharkord-modal-btn';
@@ -244,16 +361,16 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (isUpdateReady) {
       updateModalActionBtn.style.backgroundColor = '#23a559';
       updateModalActionBtn.style.color = 'white';
-      updateModalActionBtn.innerText = 'Instalar Agora';
+      updateModalActionBtn.innerText = t('btnInstallNow');
       updateModalActionBtn.onclick = () => ipcRenderer.send('install-update');
     } else {
       updateModalActionBtn.style.backgroundColor = '#5865F2';
       updateModalActionBtn.style.color = 'white';
-      updateModalActionBtn.innerText = 'Buscar Atualizações';
+      updateModalActionBtn.innerText = t('btnSearchUpdates');
       updateModalActionBtn.onclick = () => {
-        updateModalActionBtn.innerText = 'Buscando...';
+        updateModalActionBtn.innerText = t('btnSearching');
         updateModalActionBtn.disabled = true;
-        updateModalText.innerText = 'Procurando atualizações no servidor. Aguarde...';
+        updateModalText.innerText = t('updateStatusSearching');
         ipcRenderer.send('manual-check-update');
       };
     }
@@ -273,7 +390,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   ipcRenderer.invoke('is-update-ready').then(ready => {
     if (ready) {
       isUpdateReady = true;
-      updateBtn.innerText = 'Atualização Pronta';
+      updateBtn.innerText = t('updateStatusReady');
       updateBtn.style.backgroundColor = '#23a559';
       updateBtn.style.transform = 'translateX(0)';
       updateBtn.style.opacity = '1';
@@ -284,7 +401,7 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Criação do botão de configurações
   const settingsBtn = document.createElement('button');
   settingsBtn.className = 'sharkord-settings-btn';
-  settingsBtn.innerText = 'Configurações';
+  settingsBtn.innerText = t('btnSettings');
 
   settingsBtn.addEventListener('click', async () => {
     // Busca o status atual salvo no localStorage (para funcionar visualmente no modo dev)
@@ -306,24 +423,24 @@ window.addEventListener('DOMContentLoaded', async () => {
     
     const title = document.createElement('h3');
     title.className = 'sharkord-modal-title';
-    title.innerText = 'Configurações do App';
+    title.innerText = t('modalSettingsTitle');
     
     const text = document.createElement('p');
     text.className = 'sharkord-modal-text';
-    text.innerText = 'Gerencie as configurações do Sharkord no seu sistema.';
+    text.innerText = t('modalSettingsDesc');
 
     // Container for toggle
     const toggleContainer = document.createElement('div');
     toggleContainer.style.display = 'flex';
     toggleContainer.style.justifyContent = 'space-between';
     toggleContainer.style.alignItems = 'center';
-    toggleContainer.style.marginBottom = '24px';
+    toggleContainer.style.marginBottom = '12px';
     toggleContainer.style.padding = '12px';
     toggleContainer.style.backgroundColor = '#1e1f22';
     toggleContainer.style.borderRadius = '8px';
 
     const toggleLabel = document.createElement('span');
-    toggleLabel.innerText = 'Iniciar com o Windows';
+    toggleLabel.innerText = t('settingAutoStart');
     toggleLabel.style.color = '#dbdee1';
     toggleLabel.style.fontWeight = '500';
 
@@ -349,27 +466,79 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     toggleContainer.appendChild(toggleLabel);
     toggleContainer.appendChild(toggleWrapper);
+    
+    // Container for language
+    const langContainer = document.createElement('div');
+    langContainer.style.display = 'flex';
+    langContainer.style.justifyContent = 'space-between';
+    langContainer.style.alignItems = 'center';
+    langContainer.style.marginBottom = '24px';
+    langContainer.style.padding = '12px';
+    langContainer.style.backgroundColor = '#1e1f22';
+    langContainer.style.borderRadius = '8px';
+
+    const langLabel = document.createElement('span');
+    langLabel.innerText = t('settingLanguage');
+    langLabel.style.color = '#dbdee1';
+    langLabel.style.fontWeight = '500';
+
+    const langOptions = document.createElement('div');
+    langOptions.style.display = 'flex';
+    langOptions.style.gap = '8px';
+    
+    const ptBtn = document.createElement('button');
+    ptBtn.className = 'sharkord-lang-btn' + (currentLang === 'pt-BR' ? ' active' : '');
+    ptBtn.innerHTML = '<img src="https://flagcdn.com/w40/br.png" width="24" height="18" alt="Português (BR)">';
+    ptBtn.title = 'Português (BR)';
+
+    const enBtn = document.createElement('button');
+    enBtn.className = 'sharkord-lang-btn' + (currentLang === 'en-US' ? ' active' : '');
+    enBtn.innerHTML = '<img src="https://flagcdn.com/w40/us.png" width="24" height="18" alt="English (US)">';
+    enBtn.title = 'English (US)';
+    
+    let selectedLang = currentLang;
+
+    ptBtn.onclick = () => {
+      selectedLang = 'pt-BR';
+      ptBtn.classList.add('active');
+      enBtn.classList.remove('active');
+    };
+
+    enBtn.onclick = () => {
+      selectedLang = 'en-US';
+      enBtn.classList.add('active');
+      ptBtn.classList.remove('active');
+    };
+
+    langOptions.appendChild(ptBtn);
+    langOptions.appendChild(enBtn);
+    langContainer.appendChild(langLabel);
+    langContainer.appendChild(langOptions);
 
     const actions = document.createElement('div');
     actions.className = 'sharkord-modal-actions';
     
     const cancelBtn = document.createElement('button');
     cancelBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
-    cancelBtn.innerText = 'Cancelar';
+    cancelBtn.innerText = t('btnCancel');
     cancelBtn.onclick = () => document.body.removeChild(overlay);
     
     const saveBtn = document.createElement('button');
     saveBtn.className = 'sharkord-modal-btn';
     saveBtn.style.backgroundColor = '#5865F2';
     saveBtn.style.color = 'white';
-    saveBtn.innerText = 'Salvar';
+    saveBtn.innerText = t('btnSave');
     saveBtn.onclick = async () => {
-      saveBtn.innerText = 'Salvando...';
+      saveBtn.innerText = t('btnSaving');
       saveBtn.disabled = true;
       try {
         await ipcRenderer.invoke('toggle-auto-start', isAutoStart);
-        // Salva localmente para a interface lembrar (já que o Windows não retorna status em modo Dev)
         localStorage.setItem('sharkord_autostart', isAutoStart);
+        
+        if (selectedLang !== currentLang) {
+          ipcRenderer.send('set-language', selectedLang);
+          setTimeout(() => location.reload(), 300);
+        }
       } catch (err) {
         alert('Erro ao salvar: ' + (err.message || err));
       }
@@ -382,6 +551,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     modal.appendChild(title);
     modal.appendChild(text);
     modal.appendChild(toggleContainer);
+    modal.appendChild(langContainer);
     modal.appendChild(actions);
     overlay.appendChild(modal);
     
@@ -395,29 +565,31 @@ window.addEventListener('DOMContentLoaded', async () => {
     if (updateModalText && updateModalActionBtn) {
       updateModalText.innerText = status;
       if (status.startsWith('Baixando')) {
-        updateModalActionBtn.innerText = 'Aguarde...';
+        updateModalActionBtn.innerText = t('updateStatusWait');
         updateModalActionBtn.disabled = true;
         updateModalActionBtn.style.backgroundColor = '#5865F2';
       } else if (status === 'Sem atualizações') {
-        updateModalText.innerText = 'Você já está na versão mais recente!';
-        updateModalActionBtn.innerText = 'OK';
+        updateModalText.innerText = t('updateStatusNoUpdatesTitle');
+        updateModalActionBtn.innerText = t('updateStatusOk');
         updateModalActionBtn.disabled = false;
         updateModalActionBtn.onclick = () => {
           document.body.removeChild(updateModalOverlay);
           updateModalOverlay = null;
         };
+        if (updateModalCancelBtn) updateModalCancelBtn.style.display = 'none';
       } else if (status.startsWith('Erro')) {
         updateModalText.innerText = status;
-        updateModalActionBtn.innerText = 'OK';
+        updateModalActionBtn.innerText = t('updateStatusOk');
         updateModalActionBtn.disabled = false;
         updateModalActionBtn.onclick = () => {
           document.body.removeChild(updateModalOverlay);
           updateModalOverlay = null;
         };
+        if (updateModalCancelBtn) updateModalCancelBtn.style.display = 'none';
       } else if (status === 'Pronto!') {
         isUpdateReady = true;
-        updateModalText.innerText = 'Download concluído! Instalar agora?';
-        updateModalActionBtn.innerText = 'Instalar Agora';
+        updateModalText.innerText = t('updateStatusReadyTitle');
+        updateModalActionBtn.innerText = t('btnInstallNow');
         updateModalActionBtn.style.backgroundColor = '#23a559';
         updateModalActionBtn.disabled = false;
         updateModalActionBtn.onclick = () => ipcRenderer.send('install-update');
@@ -428,14 +600,24 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Escuta se há atualizações prontas para instalar em segundo plano
   ipcRenderer.on('update-ready', () => {
     isUpdateReady = true;
-    updateBtn.innerText = 'Atualização Pronta';
+    updateBtn.innerText = t('updateStatusReady');
     updateBtn.style.backgroundColor = '#23a559';
     updateBtn.style.transform = 'translateX(0)';
   });
+  } catch (err) {
+    require('fs').writeFileSync(require('path').join(require('os').tmpdir(), 'sharkord_preload_error.log'), err.stack || err.toString());
+    console.error('PRELOAD ERROR:', err);
+  }
 });
 
 // UI do Seletor Visual de Telas
-ipcRenderer.on('show-screen-picker', (event, sources) => {
+ipcRenderer.on('show-screen-picker', async (event, sources) => {
+  let currentLang = 'pt-BR';
+  try {
+    currentLang = await ipcRenderer.invoke('get-language');
+  } catch(e) {}
+  const langTrans = translations[currentLang] || translations['pt-BR'];
+  const pickerTitle = langTrans ? langTrans.screenPickerTitle : 'Escolha o que compartilhar';
   // Cria o overlay
   const overlay = document.createElement('div');
   overlay.style.position = 'fixed';
@@ -472,7 +654,7 @@ ipcRenderer.on('show-screen-picker', (event, sources) => {
   header.style.alignItems = 'center';
   
   const title = document.createElement('h2');
-  title.innerText = 'Escolha o que compartilhar';
+  title.innerText = pickerTitle;
   title.style.color = '#f2f3f5';
   title.style.margin = '0';
   title.style.fontSize = '20px';
