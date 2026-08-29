@@ -22,41 +22,52 @@
       overflow-y: hidden;
       flex-shrink: 0;
       border-bottom: 1px solid #111214;
+      padding: 2px 2px 0 2px;
     }
     #tab-bar::-webkit-scrollbar { height: 4px; }
     #tab-bar::-webkit-scrollbar-track { background: #1e1f22; }
     #tab-bar::-webkit-scrollbar-thumb { background: #313338; border-radius: 4px; }
     
+    #tabs-container {
+      display: flex;
+      gap: 2px;
+    }
+
     .tab {
       display: flex;
       align-items: center;
-      padding: 8px 16px;
+      padding: 3px 10px;
       color: #b5bac1;
-      font-size: 14px;
+      font-size: 11px;
       cursor: pointer;
-      min-width: 150px;
-      max-width: 250px;
-      border-right: 1px solid #111214;
+      min-width: 90px;
+      max-width: 150px;
       background-color: #2b2d31;
+      border-radius: 6px 6px 0 0;
       user-select: none;
       position: relative;
+      transition: background-color 0.2s, color 0.2s;
     }
-    .tab:hover { background-color: #313338; color: #dbdee1; }
+    .tab:hover { background-color: #35373c; color: #dbdee1; }
     .tab.active { background-color: #313338; color: #f2f3f5; font-weight: 500; }
-    .tab-title { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; }
-    .tab-close { opacity: 0.5; cursor: pointer; padding: 2px 4px; border-radius: 4px; font-size: 16px; line-height: 1; }
+    .tab-title { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 6px; }
+    .tab-close { opacity: 0.5; cursor: pointer; padding: 1px 5px; border-radius: 4px; font-size: 14px; line-height: 1; transition: all 0.2s; }
     .tab-close:hover { opacity: 1; background-color: #404249; color: #fa777c; }
     
     #add-tab {
-      padding: 8px 16px;
+      padding: 2px 10px;
       color: #b5bac1;
       cursor: pointer;
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 18px;
+      font-size: 16px;
+      border-radius: 6px;
+      margin-left: 2px;
+      margin-bottom: 2px;
+      transition: background-color 0.2s, color 0.2s;
     }
-    #add-tab:hover { color: #f2f3f5; background-color: #313338; }
+    #add-tab:hover { color: #f2f3f5; background-color: #2b2d31; }
     
     #webviews {
       flex-grow: 1;

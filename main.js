@@ -313,6 +313,9 @@ ipcMain.on('switch-to-tabs-mode', () => {
 ipcMain.on('switch-to-single-mode', () => {
   if (mainWindow) mainWindow.webContents.send('toggle-tab-bar', false);
 });
+ipcMain.on('open-external', (e, url) => {
+  shell.openExternal(url);
+});
 ipcMain.on('relaunch-app', () => {
   app.relaunch();
   app.quit();

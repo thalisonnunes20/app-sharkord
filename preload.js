@@ -685,6 +685,16 @@ window.addEventListener('DOMContentLoaded', async () => {
   document.addEventListener('drop', (e) => {
     e.preventDefault();
   });
+
+  // Força abertura de links _blank no navegador externo com o botão esquerdo
+  document.addEventListener('click', (e) => {
+    const a = e.target.closest('a');
+    if (a && a.target === '_blank' && a.href) {
+      e.preventDefault();
+      ipcRenderer.send('open-external', a.href);
+    }
+  });
+
   } catch (err) {
     require('fs').writeFileSync(require('path').join(require('os').tmpdir(), 'sharkord_preload_error.log'), err.stack || err.toString());
     console.error('PRELOAD ERROR:', err);
