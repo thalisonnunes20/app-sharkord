@@ -13,7 +13,12 @@ contextBridge.exposeInMainWorld('electronAPI', {
   toggleAutoStart: (enable) => ipcRenderer.invoke('toggle-auto-start', enable),
   getLanguage: () => ipcRenderer.invoke('get-language'),
   setLanguage: (lang) => ipcRenderer.send('set-language', lang),
-  onLanguageChanged: (callback) => ipcRenderer.on('language-changed', (e, lang) => callback(lang))
+  onLanguageChanged: (callback) => ipcRenderer.on('language-changed', (e, lang) => callback(lang)),
+  getPreloadPath: () => ipcRenderer.invoke('get-preload-path'),
+  getIndexPath: () => ipcRenderer.invoke('get-index-path'),
+  getSavedUrl: () => ipcRenderer.invoke('get-saved-url'),
+  getEnableTabs: () => ipcRenderer.invoke('get-enable-tabs'),
+  onToggleTabBar: (callback) => ipcRenderer.on('toggle-tab-bar', (e, show) => callback(show))
 });
 
 const translations = {
@@ -60,7 +65,10 @@ const translations = {
     updateStatusReadyTitle: 'Download concluído! Instalar agora?',
     errorConn: 'Falha ao conectar ao servidor. Verifique a URL e tente novamente.',
     btnConnect: 'Conectar',
-    screenPickerTitle: 'Escolha o que compartilhar'
+    screenPickerTitle: 'Escolha o que compartilhar',
+    settingTabs: 'Habilitar Abas (Tabs)',
+    modalRestartTitle: 'Reinício Necessário',
+    modalRestartDesc: 'O aplicativo será reiniciado para aplicar essa configuração.'
   },
   'en-US': {
     welcomeTitle: 'Welcome back!',
@@ -105,7 +113,10 @@ const translations = {
     updateStatusReadyTitle: 'Download complete! Install now?',
     errorConn: 'Failed to connect to the server. Check the URL and try again.',
     btnConnect: 'Connect',
-    screenPickerTitle: 'Choose what to share'
+    screenPickerTitle: 'Choose what to share',
+    settingTabs: 'Enable Tabs',
+    modalRestartTitle: 'Restart Required',
+    modalRestartDesc: 'The application will be restarted to apply this setting.'
   }
 };
 
@@ -118,8 +129,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   // Configura a versão da tela inicial se ela existir
   const versionEl = document.getElementById('app-version');
   if (versionEl && window.electronAPI && window.electronAPI.getVersion) {
-    const v = await window.electronAPI.getVersion();
-    versionEl.innerText = 'v' + v;
+    window.electronAPI.getVersion().then(v => {
+      versionEl.innerText = 'v' + v;
+    }).catch(()=>{});
+  }
+
+  // Não injeta botões visuais na casca de abas (tabs-shell), apenas nos webviews
+  if (window.location.pathname.endsWith('tabs-shell.html')) {
+    return;
   }
 
   // Inject custom Tailwind-like CSS for modals and buttons em TODAS as páginas
@@ -398,22 +415,23 @@ window.addEventListener('DOMContentLoaded', async () => {
   }).catch(() => {});
 
 
+  let globalAutoStart = localStorage.getItem('sharkord_autostart') === 'true';
+  let globalTabsEnabled = false;
+
+  // Pré-carrega no fundo para não travar quando clicar na engrenagem
+  try {
+    ipcRenderer.invoke('get-auto-start').then(res => { if(res !== undefined && res !== null) globalAutoStart = res; }).catch(()=>{});
+    ipcRenderer.invoke('get-enable-tabs').then(res => { globalTabsEnabled = res; }).catch(()=>{});
+  } catch(err) {}
+
   // Criação do botão de configurações
   const settingsBtn = document.createElement('button');
   settingsBtn.className = 'sharkord-settings-btn';
   settingsBtn.innerText = t('btnSettings');
 
-  settingsBtn.addEventListener('click', async () => {
-    // Busca o status atual salvo no localStorage (para funcionar visualmente no modo dev)
-    let isAutoStart = localStorage.getItem('sharkord_autostart') === 'true';
-    
-    // Tenta sincronizar com o backend
-    try {
-      const backendState = await ipcRenderer.invoke('get-auto-start');
-      if (backendState !== undefined && backendState !== null) {
-        isAutoStart = backendState;
-      }
-    } catch(err) {}
+  settingsBtn.addEventListener('click', () => {
+    let isAutoStart = globalAutoStart;
+    let isTabsEnabled = globalTabsEnabled;
 
     const overlay = document.createElement('div');
     overlay.className = 'sharkord-modal-overlay';
@@ -466,6 +484,43 @@ window.addEventListener('DOMContentLoaded', async () => {
 
     toggleContainer.appendChild(toggleLabel);
     toggleContainer.appendChild(toggleWrapper);
+    
+    // Container for Tabs Enable
+    const tabsContainer = document.createElement('div');
+    tabsContainer.style.display = 'flex';
+    tabsContainer.style.justifyContent = 'space-between';
+    tabsContainer.style.alignItems = 'center';
+    tabsContainer.style.marginBottom = '12px';
+    tabsContainer.style.padding = '12px';
+    tabsContainer.style.backgroundColor = '#1e1f22';
+    tabsContainer.style.borderRadius = '8px';
+
+    const tabsLabel = document.createElement('span');
+    tabsLabel.innerText = t('settingTabs');
+    tabsLabel.style.color = '#dbdee1';
+    tabsLabel.style.fontWeight = '500';
+
+    const tabsWrapper = document.createElement('label');
+    tabsWrapper.className = 'sharkord-toggle-switch';
+
+    const tabsInput = document.createElement('input');
+    tabsInput.type = 'checkbox';
+    tabsInput.checked = isTabsEnabled;
+
+    const tabsSlider = document.createElement('span');
+    tabsSlider.className = 'sharkord-toggle-slider';
+
+    tabsWrapper.appendChild(tabsInput);
+    tabsWrapper.appendChild(tabsSlider);
+
+    tabsWrapper.addEventListener('click', (e) => {
+      e.preventDefault();
+      isTabsEnabled = !isTabsEnabled;
+      tabsInput.checked = isTabsEnabled;
+    });
+
+    tabsContainer.appendChild(tabsLabel);
+    tabsContainer.appendChild(tabsWrapper);
     
     // Container for language
     const langContainer = document.createElement('div');
@@ -545,6 +600,17 @@ window.addEventListener('DOMContentLoaded', async () => {
           const disconnectBtn = document.querySelector('.sharkord-disconnect-btn');
           if (disconnectBtn) disconnectBtn.innerText = t('btnLeave');
         }
+
+        const oldTabs = globalTabsEnabled;
+        if (isTabsEnabled !== oldTabs) {
+          await ipcRenderer.invoke('toggle-enable-tabs', isTabsEnabled);
+          globalTabsEnabled = isTabsEnabled;
+          if (isTabsEnabled) {
+            ipcRenderer.send('switch-to-tabs-mode');
+          } else {
+            ipcRenderer.send('switch-to-single-mode');
+          }
+        }
       } catch (err) {
         alert('Erro ao salvar: ' + (err.message || err));
       }
@@ -557,6 +623,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     modal.appendChild(title);
     modal.appendChild(text);
     modal.appendChild(toggleContainer);
+    modal.appendChild(tabsContainer);
     modal.appendChild(langContainer);
     modal.appendChild(actions);
     overlay.appendChild(modal);

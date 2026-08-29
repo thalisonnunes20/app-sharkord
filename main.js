@@ -1,4 +1,10 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, shell } = require('electron');
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, shell, webContents } = require('electron');
+
+function broadcast(channel, ...args) {
+  webContents.getAllWebContents().forEach(wc => {
+    if (!wc.isDestroyed()) wc.send(channel, ...args);
+  });
+}
 const { https } = require('follow-redirects');
 const fs = require('fs');
 const path = require('path');
@@ -26,7 +32,7 @@ function compareVersions(v1, v2) {
 }
 
 function checkCustomGitHubUpdate() {
-  if (mainWindow) mainWindow.webContents.send('update-status', 'Buscando...');
+  broadcast('update-status', 'Buscando...');
   
   const options = {
     hostname: 'api.github.com',
@@ -43,7 +49,7 @@ function checkCustomGitHubUpdate() {
   });
 
   req.on('error', (err) => {
-    if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: ' + (err.message || err));
+    broadcast('update-status', 'Erro: ' + (err.message || err));
   });
 }
 
@@ -53,7 +59,7 @@ function parseReleaseResponse(res) {
   res.on('end', () => {
     try {
       if (res.statusCode !== 200) {
-        if (mainWindow) mainWindow.webContents.send('update-status', 'Erro no GitHub: HTTP ' + res.statusCode);
+        broadcast('update-status', 'Erro no GitHub: HTTP ' + res.statusCode);
         return;
       }
       const release = JSON.parse(data);
@@ -63,21 +69,21 @@ function parseReleaseResponse(res) {
       if (compareVersions(latestVersion, currentVersion) > 0) {
         const exeAsset = (release.assets || []).find(a => a.name && a.name.endsWith('.exe') && !a.name.endsWith('.blockmap'));
         if (!exeAsset) {
-          if (mainWindow) mainWindow.webContents.send('update-status', 'Erro: Executável não encontrado na release');
+          broadcast('update-status', 'Erro: Executável não encontrado na release');
           return;
         }
         downloadUpdateFile(exeAsset.browser_download_url, exeAsset.name);
       } else {
-        if (mainWindow) mainWindow.webContents.send('update-status', 'Sem atualizações');
+        broadcast('update-status', 'Sem atualizações');
       }
     } catch (err) {
-      if (mainWindow) mainWindow.webContents.send('update-status', 'Erro ao ler dados: ' + err.message);
+      broadcast('update-status', 'Erro ao ler dados: ' + err.message);
     }
   });
 }
 
 function downloadUpdateFile(fileUrl, fileName) {
-  if (mainWindow) mainWindow.webContents.send('update-status', 'Baixando');
+  broadcast('update-status', 'Baixando');
   
   const tempPath = path.join(app.getPath('temp'), fileName);
   downloadedExePath = tempPath;
@@ -90,7 +96,7 @@ function downloadUpdateFile(fileUrl, fileName) {
       }
 
       if (res.statusCode !== 200) {
-        if (mainWindow) mainWindow.webContents.send('update-status', 'Erro no download: HTTP ' + res.statusCode);
+        broadcast('update-status', 'Erro no download: HTTP ' + res.statusCode);
         return;
       }
 
@@ -103,19 +109,17 @@ function downloadUpdateFile(fileUrl, fileName) {
         fileStream.write(chunk);
         if (totalBytes > 0) {
           const percent = Math.round((downloadedBytes / totalBytes) * 100);
-          if (mainWindow) mainWindow.webContents.send('update-status', `Baixando: ${percent}%`);
+          broadcast('update-status', `Baixando: ${percent}%`);
         }
       });
 
       res.on('end', () => {
         fileStream.end();
-        if (mainWindow) {
-          mainWindow.webContents.send('update-ready');
-          mainWindow.webContents.send('update-status', 'Pronto!');
-        }
+        broadcast('update-ready');
+        broadcast('update-status', 'Pronto!');
       });
     }).on('error', (err) => {
-      if (mainWindow) mainWindow.webContents.send('update-status', 'Erro no download: ' + err.message);
+      broadcast('update-status', 'Erro no download: ' + err.message);
     });
   };
 
@@ -146,7 +150,8 @@ function createWindow() {
     webPreferences: {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
-      contextIsolation: true
+      contextIsolation: true,
+      webviewTag: true
     },
     autoHideMenuBar: true,
     show: false // Don't show until ready-to-show
@@ -218,7 +223,7 @@ function createWindow() {
         thumbnailUrl: source.thumbnail.toDataURL()
       }));
 
-      mainWindow.webContents.send('show-screen-picker', sourcesData);
+      broadcast('show-screen-picker', sourcesData);
 
       ipcMain.removeAllListeners('screen-picker-result');
       ipcMain.once('screen-picker-result', (event, sourceId) => {
@@ -237,13 +242,7 @@ function createWindow() {
     });
   });
 
-  const savedUrl = store.get('sharkordServerUrl');
-
-  if (savedUrl) {
-    mainWindow.loadURL(savedUrl);
-  } else {
-    mainWindow.loadFile('index.html');
-  }
+  mainWindow.loadFile('tabs-shell.html');
 
   mainWindow.on('closed', function () {
     mainWindow = null;
@@ -290,9 +289,7 @@ ipcMain.on('save-server-url', (event, url) => {
   if (recents.length > 2) recents = recents.slice(0, 2);
   store.set('recentServers', recents);
 
-  if (mainWindow) {
-    mainWindow.loadURL(url);
-  }
+  event.sender.loadURL(url);
 });
 
 ipcMain.handle('get-recent-servers', () => {
@@ -300,12 +297,25 @@ ipcMain.handle('get-recent-servers', () => {
 });
 
 // IPC Handler to clear the URL and go back to setup
-// IPC Handler to clear the URL and go back to setup
 ipcMain.on('clear-server-url', (event) => {
   store.delete('sharkordServerUrl');
-  if (mainWindow) {
-    mainWindow.loadFile('index.html');
-  }
+  event.sender.loadFile(path.join(__dirname, 'index.html'));
+});
+
+ipcMain.handle('get-preload-path', () => path.join(__dirname, 'preload.js'));
+ipcMain.handle('get-index-path', () => path.join(__dirname, 'index.html'));
+ipcMain.handle('get-saved-url', () => store.get('sharkordServerUrl'));
+ipcMain.handle('get-enable-tabs', () => store.get('enableTabs') || false);
+ipcMain.handle('toggle-enable-tabs', (e, enable) => { store.set('enableTabs', enable); return enable; });
+ipcMain.on('switch-to-tabs-mode', () => {
+  if (mainWindow) mainWindow.webContents.send('toggle-tab-bar', true);
+});
+ipcMain.on('switch-to-single-mode', () => {
+  if (mainWindow) mainWindow.webContents.send('toggle-tab-bar', false);
+});
+ipcMain.on('relaunch-app', () => {
+  app.relaunch();
+  app.quit();
 });
 
 // Fornece a versão do aplicativo para a UI
@@ -352,7 +362,33 @@ ipcMain.on('set-language', (event, lang) => {
   if (store) {
     store.set('language', lang);
   }
-  if (mainWindow) {
-    mainWindow.webContents.send('language-changed', lang);
+  broadcast('language-changed', lang);
+});
+
+app.on('web-contents-created', (event, contents) => {
+  if (contents.getType() === 'webview') {
+    contents.on('will-prevent-unload', (e) => e.preventDefault());
+    contents.setWindowOpenHandler(({ url }) => {
+      shell.openExternal(url);
+      return { action: 'deny' };
+    });
+    contents.on('will-navigate', (e, url) => {
+      try {
+        const urlObj = new URL(url);
+        if (urlObj.protocol === 'file:') return;
+        if (!urlObj.hostname.startsWith('sharkord.')) {
+          e.preventDefault();
+          console.warn(`Navegação bloqueada na aba para: ${url}`);
+        }
+      } catch (err) {}
+    });
+    contents.on('did-fail-load', (e, errorCode, errorDescription, validatedURL, isMainFrame) => {
+      if (isMainFrame && errorCode !== -3) {
+        contents.loadFile(path.join(__dirname, 'index.html'));
+        contents.once('did-finish-load', () => {
+          contents.send('connection-error', errorDescription);
+        });
+      }
+    });
   }
 });

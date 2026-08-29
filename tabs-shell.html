@@ -1,0 +1,217 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <title>Sharkord</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #1e1f22;
+      display: flex;
+      flex-direction: column;
+      height: 100vh;
+      overflow: hidden;
+      font-family: ui-sans-serif, system-ui, -apple-system, sans-serif;
+    }
+    #tab-bar {
+      display: flex;
+      background-color: #1e1f22;
+      overflow-x: auto;
+      overflow-y: hidden;
+      flex-shrink: 0;
+      border-bottom: 1px solid #111214;
+    }
+    #tab-bar::-webkit-scrollbar { height: 4px; }
+    #tab-bar::-webkit-scrollbar-track { background: #1e1f22; }
+    #tab-bar::-webkit-scrollbar-thumb { background: #313338; border-radius: 4px; }
+    
+    .tab {
+      display: flex;
+      align-items: center;
+      padding: 8px 16px;
+      color: #b5bac1;
+      font-size: 14px;
+      cursor: pointer;
+      min-width: 150px;
+      max-width: 250px;
+      border-right: 1px solid #111214;
+      background-color: #2b2d31;
+      user-select: none;
+      position: relative;
+    }
+    .tab:hover { background-color: #313338; color: #dbdee1; }
+    .tab.active { background-color: #313338; color: #f2f3f5; font-weight: 500; }
+    .tab-title { flex-grow: 1; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; margin-right: 8px; }
+    .tab-close { opacity: 0.5; cursor: pointer; padding: 2px 4px; border-radius: 4px; font-size: 16px; line-height: 1; }
+    .tab-close:hover { opacity: 1; background-color: #404249; color: #fa777c; }
+    
+    #add-tab {
+      padding: 8px 16px;
+      color: #b5bac1;
+      cursor: pointer;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 18px;
+    }
+    #add-tab:hover { color: #f2f3f5; background-color: #313338; }
+    
+    #webviews {
+      flex-grow: 1;
+      position: relative;
+      background-color: #313338;
+    }
+    webview {
+      width: 100%;
+      height: 100%;
+      position: absolute;
+      top: 0;
+      left: 0;
+      border: none;
+    }
+    webview.tab-hidden {
+      visibility: hidden;
+      z-index: -1;
+      position: absolute;
+      top: -9999px;
+      left: -9999px;
+    }
+    webview.active {
+      visibility: visible;
+      z-index: 1;
+      position: absolute;
+      top: 0;
+      left: 0;
+    }
+  </style>
+</head>
+<body>
+  <div id="tab-bar">
+    <div id="tabs-container" style="display: flex;"></div>
+    <div id="add-tab" title="Nova Aba">+</div>
+  </div>
+  <div id="webviews"></div>
+
+  <script>
+    const tabsContainer = document.getElementById('tabs-container');
+    const webviewsContainer = document.getElementById('webviews');
+    const addTabBtn = document.getElementById('add-tab');
+    
+    let tabIdCounter = 0;
+    let tabs = [];
+    
+    let preloadPath = '';
+    let indexPath = '';
+    let isLoaded = false;
+    
+    function formatFileUrl(p) {
+      return 'file:///' + p.replace(/\\/g, '/');
+    }
+
+    async function init() {
+      if (window.electronAPI) {
+        preloadPath = await window.electronAPI.getPreloadPath();
+        indexPath = await window.electronAPI.getIndexPath();
+        const savedUrl = await window.electronAPI.getSavedUrl();
+        const enableTabs = await window.electronAPI.getEnableTabs();
+        
+        if (!enableTabs) {
+          document.getElementById('tab-bar').style.display = 'none';
+        }
+
+        window.electronAPI.onToggleTabBar((show) => {
+          document.getElementById('tab-bar').style.display = show ? 'flex' : 'none';
+        });
+
+        // Mantém a sessão atual na primeira aba ao iniciar o app,
+        // carrega a tela inicial apenas se não houver servidor salvo.
+        createTab(savedUrl || formatFileUrl(indexPath));
+        isLoaded = true;
+      }
+    }
+
+    function createTab(url) {
+      const id = 'tab-' + (++tabIdCounter);
+      
+      const tabEl = document.createElement('div');
+      tabEl.className = 'tab';
+      tabEl.dataset.id = id;
+      
+      const titleEl = document.createElement('div');
+      titleEl.className = 'tab-title';
+      titleEl.innerText = 'Nova Aba';
+      
+      const closeEl = document.createElement('div');
+      closeEl.className = 'tab-close';
+      closeEl.innerText = '×';
+      closeEl.onclick = (e) => {
+        e.stopPropagation();
+        closeTab(id);
+      };
+      
+      tabEl.appendChild(titleEl);
+      tabEl.appendChild(closeEl);
+      tabEl.onclick = () => activateTab(id);
+      
+      tabsContainer.appendChild(tabEl);
+      
+      const wv = document.createElement('webview');
+      wv.id = 'webview-' + id;
+      wv.dataset.id = id;
+      wv.preload = formatFileUrl(preloadPath);
+      wv.className = 'tab-hidden';
+      
+      wv.addEventListener('page-title-updated', (e) => {
+        titleEl.innerText = e.title || 'Sharkord';
+      });
+      
+      webviewsContainer.appendChild(wv);
+      wv.src = url;
+      
+      tabs.push({ id, tabEl, wv });
+      activateTab(id);
+    }
+    
+    function activateTab(id) {
+      tabs.forEach(tab => {
+        if (tab.id === id) {
+          tab.tabEl.classList.add('active');
+          tab.wv.classList.remove('tab-hidden');
+          tab.wv.classList.add('active');
+        } else {
+          tab.tabEl.classList.remove('active');
+          tab.wv.classList.add('tab-hidden');
+          tab.wv.classList.remove('active');
+        }
+      });
+    }
+    
+    function closeTab(id) {
+      const idx = tabs.findIndex(t => t.id === id);
+      if (idx === -1) return;
+      
+      const tab = tabs[idx];
+      tab.tabEl.remove();
+      tab.wv.remove();
+      tabs.splice(idx, 1);
+      
+      if (tabs.length === 0) {
+        window.close();
+      } else if (tab.tabEl.classList.contains('active')) {
+        const newActive = tabs[Math.max(0, idx - 1)];
+        activateTab(newActive.id);
+      }
+    }
+    
+    addTabBtn.onclick = () => {
+      if (isLoaded) {
+        createTab(formatFileUrl(indexPath));
+      }
+    };
+    
+    init();
+  </script>
+</body>
+</html>
