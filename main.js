@@ -223,7 +223,7 @@ function createWindow() {
         thumbnailUrl: source.thumbnail.toDataURL()
       }));
 
-      broadcast('show-screen-picker', sourcesData);
+      if (mainWindow) mainWindow.webContents.send('show-screen-picker', sourcesData);
 
       ipcMain.removeAllListeners('screen-picker-result');
       ipcMain.once('screen-picker-result', (event, sourceId) => {
