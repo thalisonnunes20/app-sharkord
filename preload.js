@@ -537,7 +537,13 @@ window.addEventListener('DOMContentLoaded', async () => {
         
         if (selectedLang !== currentLang) {
           ipcRenderer.send('set-language', selectedLang);
-          setTimeout(() => location.reload(), 300);
+          currentLang = selectedLang;
+          
+          settingsBtn.innerText = t('btnSettings');
+          if (updateBtn) updateBtn.innerText = isUpdateReady ? t('updateStatusReady') : t('btnUpdate');
+          
+          const disconnectBtn = document.querySelector('.sharkord-disconnect-btn');
+          if (disconnectBtn) disconnectBtn.innerText = t('btnLeave');
         }
       } catch (err) {
         alert('Erro ao salvar: ' + (err.message || err));
@@ -603,6 +609,14 @@ window.addEventListener('DOMContentLoaded', async () => {
     updateBtn.innerText = t('updateStatusReady');
     updateBtn.style.backgroundColor = '#23a559';
     updateBtn.style.transform = 'translateX(0)';
+  });
+
+  // Corrige problema no Electron onde arrastar elementos da UI tenta navegar
+  document.addEventListener('dragover', (e) => {
+    e.preventDefault();
+  });
+  document.addEventListener('drop', (e) => {
+    e.preventDefault();
   });
   } catch (err) {
     require('fs').writeFileSync(require('path').join(require('os').tmpdir(), 'sharkord_preload_error.log'), err.stack || err.toString());

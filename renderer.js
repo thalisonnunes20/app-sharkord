@@ -6,21 +6,38 @@ document.addEventListener('DOMContentLoaded', async () => {
     currentLang = await window.electronAPI.getLanguage();
     t = (key) => window.sharkordI18n[currentLang][key] || window.sharkordI18n['pt-BR'][key] || key;
     
-    // Process data-i18n attributes
-    document.querySelectorAll('[data-i18n]').forEach(el => {
-      const key = el.getAttribute('data-i18n');
-      if (key) el.innerText = t(key);
-    });
-    
-    document.querySelectorAll('[data-i18n-html]').forEach(el => {
-      const key = el.getAttribute('data-i18n-html');
-      if (key) el.innerHTML = t(key);
-    });
-    
-    document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
-      const key = el.getAttribute('data-i18n-placeholder');
-      if (key) el.setAttribute('placeholder', t(key));
-    });
+    const updateTexts = () => {
+      document.querySelectorAll('[data-i18n]').forEach(el => {
+        const key = el.getAttribute('data-i18n');
+        if (key) el.innerText = t(key);
+      });
+      
+      document.querySelectorAll('[data-i18n-html]').forEach(el => {
+        const key = el.getAttribute('data-i18n-html');
+        if (key) el.innerHTML = t(key);
+      });
+      
+      document.querySelectorAll('[data-i18n-placeholder]').forEach(el => {
+        const key = el.getAttribute('data-i18n-placeholder');
+        if (key) el.setAttribute('placeholder', t(key));
+      });
+
+      const submitBtn = document.querySelector('.submit-btn');
+      if (submitBtn) {
+        if (submitBtn.disabled) submitBtn.innerText = t('btnConnecting');
+        else submitBtn.innerText = t('btnEnter');
+      }
+    };
+
+    updateTexts();
+
+    if (window.electronAPI.onLanguageChanged) {
+      window.electronAPI.onLanguageChanged((lang) => {
+        currentLang = lang;
+        t = (key) => window.sharkordI18n[currentLang][key] || window.sharkordI18n['pt-BR'][key] || key;
+        updateTexts();
+      });
+    }
   }
 });
 
