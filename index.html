@@ -53,19 +53,22 @@
         <img src="icon.png" alt="Logo do App" class="w-full h-full object-cover drop-shadow-md"
           onerror="this.src='data:image/svg+xml;utf8,<svg fill=%22%23b5bac1%22 viewBox=%220 0 24 24%22 xmlns=%22http://www.w3.org/2000/svg%22><path d=%22M12 2C6.48 2 2 6.48 2 12C2 17.52 6.48 22 12 22C17.52 22 22 17.52 22 12C22 6.48 17.52 2 12 2ZM11 19.93C7.05 19.43 4 16.05 4 12C4 7.95 7.05 4.57 11 4.07V19.93ZM13 4.07C16.95 4.57 20 7.95 20 12C20 16.05 16.95 19.43 13 19.93V4.07Z%22/></svg>'" />
       </div>
-      <h1 class="text-[24px] font-bold text-[#f2f3f5] mb-2 tracking-wide" data-i18n="welcomeTitle">Boas-vindas de volta!</h1>
+      <h1 class="text-[24px] font-bold text-[#f2f3f5] mb-2 tracking-wide" data-i18n="welcomeTitle">Boas-vindas de volta!
+      </h1>
       <p class="text-[#b5bac1] text-[15px]" data-i18n="welcomeDesc">Estamos muito animados em ver você novamente.</p>
     </div>
 
     <!-- Form -->
     <form id="setup-form" class="flex flex-col text-left">
       <div class="mb-5">
-        <label for="server-url" class="block text-[#b5bac1] text-[12px] font-bold uppercase tracking-wide mb-2" data-i18n-html="serverUrlLabel">
+        <label for="server-url" class="block text-[#b5bac1] text-[12px] font-bold uppercase tracking-wide mb-2"
+          data-i18n-html="serverUrlLabel">
           URL do Servidor Sharkord <span class="text-[#fa777c]">*</span>
         </label>
         <input type="url" id="server-url"
           class="w-full bg-[#1e1f22] text-[#dbdee1] p-[10px] rounded-[3px] border-none outline-none focus:ring-1 focus:ring-[#5865F2] transition-shadow text-[16px]"
-          placeholder="https://seu-servidor.com" required autocomplete="off" spellcheck="false" data-i18n-placeholder="serverUrlPlaceholder" />
+          placeholder="https://seu-servidor.com" required autocomplete="off" spellcheck="false"
+          data-i18n-placeholder="serverUrlPlaceholder" />
         <div class="hidden text-[#fa777c] text-[12px] mt-1.5 font-medium" id="error-message">
           Por favor, insira uma URL válida.
         </div>
@@ -76,13 +79,15 @@
       </div>
 
       <button type="submit"
-        class="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium text-[16px] py-[10px] px-4 rounded-[3px] transition-colors duration-200 submit-btn mt-2" data-i18n="btnEnter">
+        class="w-full bg-[#5865F2] hover:bg-[#4752C4] text-white font-medium text-[16px] py-[10px] px-4 rounded-[3px] transition-colors duration-200 submit-btn mt-2"
+        data-i18n="btnEnter">
         Entrar
       </button>
 
       <!-- Servidores Recentes -->
       <div id="recent-servers-container" class="hidden mt-6 pt-4 border-t border-[#1e1f22]">
-        <h3 class="text-[#b5bac1] text-[11px] font-bold uppercase tracking-wide mb-2" data-i18n="recentServers">Acessados Recentemente</h3>
+        <h3 class="text-[#b5bac1] text-[11px] font-bold uppercase tracking-wide mb-2" data-i18n="recentServers">
+          Acessados Recentemente</h3>
         <div id="recent-servers-list" class="flex flex-col gap-2">
           <!-- Inserido pelo JS -->
         </div>
@@ -93,13 +98,14 @@
     <div class="mt-6 text-[#b5bac1] text-[12px] flex flex-col gap-2 items-center text-center">
       <span>
         <span data-i18n="helpPlatform">Problemas com a plataforma?</span>
-        <a href="https://github.com/sharkord/sharkord" target="_blank" class="text-[#00A8FC] hover:underline" data-i18n="helpPlatformLink">Acesse o
+        <a href="https://github.com/sharkord/sharkord" target="_blank" class="text-[#00A8FC] hover:underline"
+          data-i18n="helpPlatformLink">Acesse o
           repositório oficial do Sharkord.</a>
       </span>
       <span>
         <span data-i18n="helpApp">Dúvidas sobre este App para Windows?</span>
-        <a href="https://github.com/thalisonnunes20/app-sharkord" target="_blank"
-          class="text-[#00A8FC] hover:underline" data-i18n="helpAppLink">Acesse o nosso repositório.</a>
+        <a href="https://github.com/thalisonnunes20/app-sharkord" target="_blank" class="text-[#00A8FC] hover:underline"
+          data-i18n="helpAppLink">Acesse o nosso repositório.</a>
       </span>
     </div>
 
@@ -107,7 +113,7 @@
 
   <!-- App Version -->
   <div id="app-version" class="absolute bottom-4 right-4 text-[#80848e] text-[11px] font-medium tracking-wide">
-    v1.1.7
+    v1.1.8
   </div>
 
   <script src="renderer.js"></script>

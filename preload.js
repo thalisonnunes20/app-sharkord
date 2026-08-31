@@ -18,7 +18,9 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getIndexPath: () => ipcRenderer.invoke('get-index-path'),
   getSavedUrl: () => ipcRenderer.invoke('get-saved-url'),
   getEnableTabs: () => ipcRenderer.invoke('get-enable-tabs'),
-  onToggleTabBar: (callback) => ipcRenderer.on('toggle-tab-bar', (e, show) => callback(show))
+  onToggleTabBar: (callback) => ipcRenderer.on('toggle-tab-bar', (e, show) => callback(show)),
+  getSavedTabs: () => ipcRenderer.invoke('get-saved-tabs'),
+  saveTabs: (tabsList) => ipcRenderer.send('save-tabs', tabsList)
 });
 
 const translations = {

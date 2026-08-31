@@ -260,7 +260,8 @@ app.whenReady().then(async () => {
       const autoStartVal = Boolean(store.get('autoStart'));
       app.setLoginItemSettings({
         openAtLogin: autoStartVal,
-        path: process.execPath
+        path: process.execPath,
+        args: app.isPackaged ? [] : [app.getAppPath()]
       });
     }
   } catch (err) {
@@ -344,7 +345,8 @@ ipcMain.handle('toggle-auto-start', (event, enable) => {
   try {
     app.setLoginItemSettings({
       openAtLogin: isEnabled,
-      path: process.execPath
+      path: process.execPath,
+      args: app.isPackaged ? [] : [app.getAppPath()]
     });
   } catch (err) {
     console.error('Erro ao definir auto-start:', err);
@@ -395,3 +397,17 @@ app.on('web-contents-created', (event, contents) => {
     });
   }
 });
+
+ipcMain.handle('get-saved-tabs', () => {
+  if (store) {
+    return store.get('savedTabs') || [];
+  }
+  return [];
+});
+
+ipcMain.on('save-tabs', (event, tabsList) => {
+  if (store) {
+    store.set('savedTabs', tabsList);
+  }
+});
+

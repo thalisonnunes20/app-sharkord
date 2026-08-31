@@ -121,6 +121,14 @@
       return 'file:///' + p.replace(/\\/g, '/');
     }
 
+    function saveTabs() {
+      if (!window.electronAPI) return;
+      const validUrls = tabs
+        .map(t => t.url)
+        .filter(url => url && url.startsWith('http'));
+      window.electronAPI.saveTabs(validUrls);
+    }
+
     async function init() {
       if (window.electronAPI) {
         preloadPath = await window.electronAPI.getPreloadPath();
@@ -136,9 +144,13 @@
           document.getElementById('tab-bar').style.display = show ? 'flex' : 'none';
         });
 
-        // Mantém a sessão atual na primeira aba ao iniciar o app,
-        // carrega a tela inicial apenas se não houver servidor salvo.
-        createTab(savedUrl || formatFileUrl(indexPath));
+        const savedTabsUrls = await window.electronAPI.getSavedTabs();
+        
+        if (savedTabsUrls && savedTabsUrls.length > 0) {
+          savedTabsUrls.forEach(url => createTab(url));
+        } else {
+          createTab(savedUrl || formatFileUrl(indexPath));
+        }
         isLoaded = true;
       }
     }
@@ -174,15 +186,26 @@
       wv.preload = formatFileUrl(preloadPath);
       wv.className = 'tab-hidden';
       
+      const tabObj = { id, tabEl, wv, url };
+      
       wv.addEventListener('page-title-updated', (e) => {
         titleEl.innerText = e.title || 'Sharkord';
+      });
+      wv.addEventListener('did-navigate', (e) => {
+        tabObj.url = e.url;
+        saveTabs();
+      });
+      wv.addEventListener('did-navigate-in-page', (e) => {
+        tabObj.url = e.url;
+        saveTabs();
       });
       
       webviewsContainer.appendChild(wv);
       wv.src = url;
       
-      tabs.push({ id, tabEl, wv });
+      tabs.push(tabObj);
       activateTab(id);
+      saveTabs();
     }
     
     function activateTab(id) {
@@ -207,6 +230,7 @@
       tab.tabEl.remove();
       tab.wv.remove();
       tabs.splice(idx, 1);
+      saveTabs();
       
       if (tabs.length === 0) {
         window.close();
