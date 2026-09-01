@@ -20,7 +20,8 @@ contextBridge.exposeInMainWorld('electronAPI', {
   getEnableTabs: () => ipcRenderer.invoke('get-enable-tabs'),
   onToggleTabBar: (callback) => ipcRenderer.on('toggle-tab-bar', (e, show) => callback(show)),
   getSavedTabs: () => ipcRenderer.invoke('get-saved-tabs'),
-  saveTabs: (tabsList) => ipcRenderer.send('save-tabs', tabsList)
+  getActiveTabIndex: () => ipcRenderer.invoke('get-active-tab-index'),
+  saveTabs: (tabsList, activeIndex) => ipcRenderer.send('save-tabs', tabsList, activeIndex)
 });
 
 const translations = {
@@ -477,11 +478,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     toggleWrapper.appendChild(toggleInput);
     toggleWrapper.appendChild(toggleSlider);
 
-    // Controle explícito do clique para evitar bugs do navegador com labels
-    toggleWrapper.addEventListener('click', (e) => {
-      e.preventDefault(); // Evita que o clique dispare o checkbox nativamente 2 vezes
-      isAutoStart = !isAutoStart;
-      toggleInput.checked = isAutoStart;
+    toggleInput.addEventListener('change', (e) => {
+      isAutoStart = e.target.checked;
     });
 
     toggleContainer.appendChild(toggleLabel);
@@ -515,10 +513,8 @@ window.addEventListener('DOMContentLoaded', async () => {
     tabsWrapper.appendChild(tabsInput);
     tabsWrapper.appendChild(tabsSlider);
 
-    tabsWrapper.addEventListener('click', (e) => {
-      e.preventDefault();
-      isTabsEnabled = !isTabsEnabled;
-      tabsInput.checked = isTabsEnabled;
+    tabsInput.addEventListener('change', (e) => {
+      isTabsEnabled = e.target.checked;
     });
 
     tabsContainer.appendChild(tabsLabel);
@@ -591,6 +587,7 @@ window.addEventListener('DOMContentLoaded', async () => {
       try {
         await ipcRenderer.invoke('toggle-auto-start', isAutoStart);
         localStorage.setItem('sharkord_autostart', isAutoStart);
+        globalAutoStart = isAutoStart;
         
         if (selectedLang !== currentLang) {
           ipcRenderer.send('set-language', selectedLang);

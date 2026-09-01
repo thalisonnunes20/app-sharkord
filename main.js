@@ -1,5 +1,17 @@
 const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, shell, webContents } = require('electron');
 
+const gotTheLock = app.requestSingleInstanceLock();
+if (!gotTheLock) {
+  app.quit();
+} else {
+  app.on('second-instance', (event, commandLine, workingDirectory) => {
+    if (mainWindow) {
+      if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.focus();
+    }
+  });
+}
+
 function broadcast(channel, ...args) {
   webContents.getAllWebContents().forEach(wc => {
     if (!wc.isDestroyed()) wc.send(channel, ...args);
@@ -229,7 +241,8 @@ function createWindow() {
       ipcMain.once('screen-picker-result', (event, sourceId) => {
         if (screenPickerCallback) {
           if (sourceId) {
-            screenPickerCallback({ video: { id: sourceId, name: 'Screen' }, audio: 'loopback' });
+            const selectedSource = sources.find(s => s.id === sourceId);
+            screenPickerCallback({ video: selectedSource || { id: sourceId, name: 'Screen' }, audio: 'loopback' });
           } else {
             screenPickerCallback(); // Cancelado
           }
@@ -405,9 +418,19 @@ ipcMain.handle('get-saved-tabs', () => {
   return [];
 });
 
-ipcMain.on('save-tabs', (event, tabsList) => {
+ipcMain.handle('get-active-tab-index', () => {
+  if (store) {
+    return store.get('activeTabIndex') || 0;
+  }
+  return 0;
+});
+
+ipcMain.on('save-tabs', (event, tabsList, activeIndex) => {
   if (store) {
     store.set('savedTabs', tabsList);
+    if (activeIndex !== undefined) {
+      store.set('activeTabIndex', activeIndex);
+    }
   }
 });
 

@@ -111,6 +111,7 @@
     const addTabBtn = document.getElementById('add-tab');
     
     let tabIdCounter = 0;
+    let isInitLoading = true;
     let tabs = [];
     
     let preloadPath = '';
@@ -122,11 +123,12 @@
     }
 
     function saveTabs() {
-      if (!window.electronAPI) return;
+      if (isInitLoading || !window.electronAPI) return;
       const validUrls = tabs
         .map(t => t.url)
         .filter(url => url && url.startsWith('http'));
-      window.electronAPI.saveTabs(validUrls);
+      const activeIdx = tabs.findIndex(t => t.tabEl.classList.contains('active'));
+      window.electronAPI.saveTabs(validUrls, activeIdx >= 0 ? activeIdx : 0);
     }
 
     async function init() {
@@ -145,17 +147,24 @@
         });
 
         const savedTabsUrls = await window.electronAPI.getSavedTabs();
+        const savedActiveIdx = await window.electronAPI.getActiveTabIndex();
         
         if (savedTabsUrls && savedTabsUrls.length > 0) {
-          savedTabsUrls.forEach(url => createTab(url));
+          savedTabsUrls.forEach(url => createTab(url, false));
+          const tabToActivate = tabs[savedActiveIdx] || tabs[tabs.length - 1];
+          if (tabToActivate) {
+             activateTab(tabToActivate.id);
+          }
         } else {
-          createTab(savedUrl || formatFileUrl(indexPath));
+          createTab(savedUrl || formatFileUrl(indexPath), true);
         }
+        isInitLoading = false;
         isLoaded = true;
+        saveTabs();
       }
     }
 
-    function createTab(url) {
+    function createTab(url, shouldActivate = true) {
       const id = 'tab-' + (++tabIdCounter);
       
       const tabEl = document.createElement('div');
@@ -204,7 +213,9 @@
       wv.src = url;
       
       tabs.push(tabObj);
-      activateTab(id);
+      if (shouldActivate) {
+        activateTab(id);
+      }
       saveTabs();
     }
     
@@ -220,6 +231,7 @@
           tab.wv.classList.remove('active');
         }
       });
+      saveTabs();
     }
     
     function closeTab(id) {
