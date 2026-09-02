@@ -191,7 +191,7 @@ function createWindow() {
       const urlObj = new URL(url);
       if (urlObj.protocol === 'file:') return; // Permite index.html local
       
-      if (!urlObj.hostname.startsWith('sharkord.')) {
+      if (!urlObj.hostname.startsWith('sharkord.') && urlObj.hostname !== 'demo.sharkord.com') {
         event.preventDefault();
         console.warn(`Navegação bloqueada para: ${url}`);
       }
@@ -296,11 +296,11 @@ app.on('window-all-closed', function () {
 ipcMain.on('save-server-url', (event, url) => {
   store.set('sharkordServerUrl', url);
   
-  // Atualiza histórico de servidores recentes (max 2)
+  // Atualiza histórico de servidores recentes (max 3)
   let recents = store.get('recentServers') || [];
   recents = recents.filter(item => item !== url); // Remove se já existir para colocar no topo
   recents.unshift(url);
-  if (recents.length > 2) recents = recents.slice(0, 2);
+  if (recents.length > 3) recents = recents.slice(0, 3);
   store.set('recentServers', recents);
 
   event.sender.loadURL(url);
@@ -308,6 +308,15 @@ ipcMain.on('save-server-url', (event, url) => {
 
 ipcMain.handle('get-recent-servers', () => {
   return store.get('recentServers') || [];
+});
+
+ipcMain.on('update-recent-server', (event, oldUrl, newUrl) => {
+  let recents = store.get('recentServers') || [];
+  const index = recents.indexOf(oldUrl);
+  if (index !== -1) {
+    recents[index] = newUrl;
+    store.set('recentServers', recents);
+  }
 });
 
 // IPC Handler to clear the URL and go back to setup
@@ -394,7 +403,7 @@ app.on('web-contents-created', (event, contents) => {
       try {
         const urlObj = new URL(url);
         if (urlObj.protocol === 'file:') return;
-        if (!urlObj.hostname.startsWith('sharkord.')) {
+        if (!urlObj.hostname.startsWith('sharkord.') && urlObj.hostname !== 'demo.sharkord.com') {
           e.preventDefault();
           console.warn(`Navegação bloqueada na aba para: ${url}`);
         }

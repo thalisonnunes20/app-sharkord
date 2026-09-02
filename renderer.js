@@ -57,7 +57,7 @@ document.getElementById('setup-form').addEventListener('submit', (e) => {
     const url = new URL(urlValue);
     
     // Valida se o domínio começa com sharkord.
-    if (!url.hostname.startsWith('sharkord.')) {
+    if (!url.hostname.startsWith('sharkord.') && url.hostname !== 'demo.sharkord.com') {
       throw new Error('O domínio deve iniciar com sharkord.');
     }
 
@@ -104,18 +104,70 @@ if (window.electronAPI && window.electronAPI.getRecentServers) {
       
       container.classList.remove('hidden');
       
-      recents.forEach(url => {
+      recents.forEach(itemUrl => {
+        let currentUrl = itemUrl;
         const btn = document.createElement('button');
         btn.type = 'button';
         btn.className = 'w-full text-left bg-[#2b2d31] hover:bg-[#3f4147] text-[#dbdee1] text-[13px] py-2 px-3 rounded-[3px] transition-colors duration-200 flex items-center gap-2 overflow-hidden';
         
         btn.innerHTML = `<svg width="14" height="14" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" class="text-[#b5bac1] flex-shrink-0"><path d="M10 13a5 5 0 0 0 7.54.54l3-3a5 5 0 0 0-7.07-7.07l-1.72 1.71"></path><path d="M14 11a5 5 0 0 0-7.54-.54l-3 3a5 5 0 0 0 7.07 7.07l1.71-1.71"></path></svg> 
-                         <span class="truncate">${url}</span>`;
+                         <span class="truncate url-text">${currentUrl}</span>`;
+        
+        let isEditing = false;
         
         btn.onclick = () => {
-          document.getElementById('server-url').value = url;
+          if (isEditing) return;
+          document.getElementById('server-url').value = currentUrl;
           document.getElementById('setup-form').dispatchEvent(new Event('submit'));
         };
+
+        btn.addEventListener('contextmenu', (e) => {
+          e.preventDefault();
+          e.stopPropagation();
+          if (isEditing) return;
+          isEditing = true;
+
+          const span = btn.querySelector('.url-text');
+          if (!span) return;
+          
+          const input = document.createElement('input');
+          input.type = 'text';
+          input.value = currentUrl;
+          input.className = 'w-full bg-[#1e1f22] text-[#dbdee1] text-[13px] rounded-[3px] px-1 outline-none border border-[#5865F2]';
+          
+          input.onclick = (e2) => e2.stopPropagation();
+          
+          const finalizeEdit = (save) => {
+            if (!isEditing) return;
+            if (save) {
+              const newUrl = input.value.trim();
+              if (newUrl && newUrl !== currentUrl) {
+                if (window.electronAPI.updateRecentServer) {
+                  window.electronAPI.updateRecentServer(currentUrl, newUrl);
+                }
+                currentUrl = newUrl;
+                span.innerText = currentUrl;
+              }
+            }
+            if (btn.contains(input)) btn.replaceChild(span, input);
+            setTimeout(() => { isEditing = false; }, 100);
+          };
+
+          input.addEventListener('keydown', (e2) => {
+            if (e2.key === 'Enter') {
+              e2.preventDefault();
+              finalizeEdit(true);
+            } else if (e2.key === 'Escape') {
+              e2.preventDefault();
+              finalizeEdit(false);
+            }
+          });
+          
+          input.addEventListener('blur', () => finalizeEdit(false));
+          
+          btn.replaceChild(input, span);
+          input.focus();
+        });
         
         list.appendChild(btn);
       });
