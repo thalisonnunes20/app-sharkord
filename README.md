@@ -1,5 +1,14 @@
 # Aplicativo Desktop para Sharkord
 
+<div align="left">
+  <img src="https://img.shields.io/badge/html5-%23E34F26.svg?style=for-the-badge&logo=html5&logoColor=white" alt="HTML5" />
+  <img src="https://img.shields.io/badge/javascript-%23323330.svg?style=for-the-badge&logo=javascript&logoColor=%23F7DF1E" alt="JavaScript" />
+  <img src="https://img.shields.io/badge/css3-%231572B6.svg?style=for-the-badge&logo=css3&logoColor=white" alt="CSS3" />
+  <img src="https://img.shields.io/badge/Windows-0078D6?style=for-the-badge&logo=windows&logoColor=white" alt="Windows" />
+</div>
+
+<br>
+
 **Aviso Importante:** Este projeto não é uma cópia, um fork (bifurcação) ou um projeto concorrente do Sharkord. Trata-se unicamente de um cliente desktop (wrapper/web app) desenvolvido para facilitar a utilização da interface web original. Este projeto foi feito sem quaisquer fins lucrativos, sendo totalmente código aberto e de livre acesso para a comunidade.
 
 ---
@@ -20,6 +29,9 @@ Ao abrir o aplicativo pela primeira vez, você será recebido por uma tela de co
 - **Compartilhamento de Tela Avançado:** Com suporte direto à API do sistema operacional para captura de telas e janelas específicas.
 - **Atualizações Silenciosas:** Uma vez empacotado e distribuído, o aplicativo conta com módulos de checagem para baixar instalações mais recentes em segundo plano, mantendo a experiência do usuário fluida.
 - **Interface Imersiva:** Remoção da barra de título convencional de navegadores para garantir que o seu servidor receba 100% da sua atenção visual.
+- **Controle de Domínios (Whitelist):** Por questões de direcionamento e segurança, a aplicação só permite conexão e navegação em URLs que possuam um subdomínio iniciado obrigatoriamente com a palavra `sharkord` (ex: `https://sharkord.seudominio.com`). Existe também uma exceção padrão que aceita conexões diretas ao servidor oficial em `https://demo.sharkord.com/`.
+- **Sistema de Abas Persistente:** O aplicativo conta com suporte para múltiplas abas. Quando você encerra o app, o estado das suas abas é salvo automaticamente para que elas continuem abertas na próxima vez que você iniciá-lo!
+- **Ampla Compatibilidade:** Totalmente compatível e rodando de forma lisa e estável nas versões mais atualizadas do **Windows 10** e **Windows 11**.
 
 ## Contribuindo
 
