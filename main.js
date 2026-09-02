@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, shell, webContents } = require('electron');
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, Tray, shell, webContents, dialog } = require('electron');
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -24,6 +24,8 @@ const { spawn } = require('child_process');
 
 let store;
 let mainWindow;
+let tray = null;
+let forceQuit = false;
 let downloadedExePath = null;
 
 // Fix para lentidão da câmera no Windows
@@ -257,6 +259,18 @@ function createWindow() {
 
   mainWindow.loadFile('tabs-shell.html');
 
+  mainWindow.on('close', function (event) {
+    if (forceQuit || !store) return;
+
+    if (!store.has('minimizeToTray')) {
+      event.preventDefault();
+      mainWindow.webContents.send('show-close-prompt');
+    } else if (store.get('minimizeToTray')) {
+      event.preventDefault();
+      mainWindow.hide();
+    }
+  });
+
   mainWindow.on('closed', function () {
     mainWindow = null;
   });
@@ -283,9 +297,27 @@ app.whenReady().then(async () => {
 
   createWindow();
 
+  // Criação da Bandeja de Sistema
+  const iconPath = path.join(__dirname, 'icon.png');
+  if (fs.existsSync(iconPath)) {
+    tray = new Tray(iconPath);
+    const contextMenu = Menu.buildFromTemplate([
+      { label: 'Abrir Sharkord', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
+      { type: 'separator' },
+      { label: 'Sair', click: () => { forceQuit = true; app.quit(); } }
+    ]);
+    tray.setToolTip('Sharkord');
+    tray.setContextMenu(contextMenu);
+    tray.on('click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
+  }
+
   app.on('activate', function () {
     if (BrowserWindow.getAllWindows().length === 0) createWindow();
   });
+});
+
+app.on('before-quit', () => {
+  forceQuit = true;
 });
 
 app.on('window-all-closed', function () {
@@ -330,6 +362,8 @@ ipcMain.handle('get-index-path', () => path.join(__dirname, 'index.html'));
 ipcMain.handle('get-saved-url', () => store.get('sharkordServerUrl'));
 ipcMain.handle('get-enable-tabs', () => store.get('enableTabs') || false);
 ipcMain.handle('toggle-enable-tabs', (e, enable) => { store.set('enableTabs', enable); return enable; });
+ipcMain.handle('get-minimize-to-tray', () => store.get('minimizeToTray', false));
+ipcMain.handle('set-minimize-to-tray', (e, val) => { store.set('minimizeToTray', val); return val; });
 ipcMain.on('switch-to-tabs-mode', () => {
   if (mainWindow) mainWindow.webContents.send('toggle-tab-bar', true);
 });
@@ -443,3 +477,12 @@ ipcMain.on('save-tabs', (event, tabsList, activeIndex) => {
   }
 });
 
+ipcMain.on('close-prompt-response', (event, minimize) => {
+  if (store) store.set('minimizeToTray', minimize);
+  if (minimize) {
+    if (mainWindow) mainWindow.hide();
+  } else {
+    forceQuit = true;
+    app.quit();
+  }
+});

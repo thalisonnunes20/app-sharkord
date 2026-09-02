@@ -56,7 +56,12 @@ const translations = {
     modalSettingsTitle: 'Configurações do App',
     modalSettingsDesc: 'Gerencie as configurações do Sharkord no seu sistema.',
     settingAutoStart: 'Iniciar com o Windows',
+    settingMinimizeToTray: 'Continuar em segundo plano (Bandeja)',
     settingLanguage: 'Idioma / Language',
+    modalCloseTitle: 'Deseja continuar recebendo notificações?',
+    modalCloseDesc: 'Você pode alterar essa preferência a qualquer momento nas configurações do aplicativo.',
+    btnMinimize: 'Continuar em Segundo Plano',
+    btnQuit: 'Fechar Completamente',
     btnCancel: 'Cancelar',
     btnClose: 'Fechar',
     btnSave: 'Salvar',
@@ -104,7 +109,12 @@ const translations = {
     modalSettingsTitle: 'App Settings',
     modalSettingsDesc: 'Manage your Sharkord settings on your system.',
     settingAutoStart: 'Start with Windows',
+    settingMinimizeToTray: 'Run in background (System Tray)',
     settingLanguage: 'Language / Idioma',
+    modalCloseTitle: 'Do you want to continue receiving notifications?',
+    modalCloseDesc: 'You can change this preference at any time in the app settings.',
+    btnMinimize: 'Continue in Background',
+    btnQuit: 'Close Completely',
     btnCancel: 'Cancel',
     btnClose: 'Close',
     btnSave: 'Save',
@@ -136,11 +146,6 @@ window.addEventListener('DOMContentLoaded', async () => {
     window.electronAPI.getVersion().then(v => {
       versionEl.innerText = 'v' + v;
     }).catch(()=>{});
-  }
-
-  // Não injeta botões visuais na casca de abas (tabs-shell), apenas nos webviews
-  if (window.location.pathname.endsWith('tabs-shell.html')) {
-    return;
   }
 
   // Inject custom Tailwind-like CSS for modals and buttons em TODAS as páginas
@@ -270,6 +275,11 @@ window.addEventListener('DOMContentLoaded', async () => {
       .sharkord-lang-btn.active { opacity: 1; background-color: #3f4147; }
     `;
     document.head.appendChild(style);
+
+  // Não injeta botões visuais na casca de abas (tabs-shell), apenas nos webviews
+  if (window.location.pathname.endsWith('tabs-shell.html')) {
+    return;
+  }
 
   let currentLang = 'pt-BR';
   try {
@@ -421,11 +431,13 @@ window.addEventListener('DOMContentLoaded', async () => {
 
   let globalAutoStart = localStorage.getItem('sharkord_autostart') === 'true';
   let globalTabsEnabled = false;
+  let globalMinimizeToTray = false;
 
   // Pré-carrega no fundo para não travar quando clicar na engrenagem
   try {
     ipcRenderer.invoke('get-auto-start').then(res => { if(res !== undefined && res !== null) globalAutoStart = res; }).catch(()=>{});
     ipcRenderer.invoke('get-enable-tabs').then(res => { globalTabsEnabled = res; }).catch(()=>{});
+    ipcRenderer.invoke('get-minimize-to-tray').then(res => { if(res !== undefined && res !== null) globalMinimizeToTray = res; }).catch(()=>{});
   } catch(err) {}
 
   // Criação do botão de configurações
@@ -433,7 +445,11 @@ window.addEventListener('DOMContentLoaded', async () => {
   settingsBtn.className = 'sharkord-settings-btn';
   settingsBtn.innerText = t('btnSettings');
 
-  settingsBtn.addEventListener('click', () => {
+  settingsBtn.addEventListener('click', async () => {
+    try {
+      const minTray = await ipcRenderer.invoke('get-minimize-to-tray');
+      if(minTray !== undefined && minTray !== null) globalMinimizeToTray = minTray;
+    } catch(err) {}
     let isAutoStart = globalAutoStart;
     let isTabsEnabled = globalTabsEnabled;
 
@@ -521,6 +537,42 @@ window.addEventListener('DOMContentLoaded', async () => {
     tabsContainer.appendChild(tabsLabel);
     tabsContainer.appendChild(tabsWrapper);
     
+    // Container for Minimize to Tray
+    const minimizeContainer = document.createElement('div');
+    minimizeContainer.style.display = 'flex';
+    minimizeContainer.style.justifyContent = 'space-between';
+    minimizeContainer.style.alignItems = 'center';
+    minimizeContainer.style.marginBottom = '12px';
+    minimizeContainer.style.padding = '12px';
+    minimizeContainer.style.backgroundColor = '#1e1f22';
+    minimizeContainer.style.borderRadius = '8px';
+
+    const minimizeLabel = document.createElement('span');
+    minimizeLabel.innerText = t('settingMinimizeToTray') || 'Continuar em segundo plano';
+    minimizeLabel.style.color = '#dbdee1';
+    minimizeLabel.style.fontWeight = '500';
+
+    const minimizeWrapper = document.createElement('label');
+    minimizeWrapper.className = 'sharkord-toggle-switch';
+
+    const minimizeInput = document.createElement('input');
+    minimizeInput.type = 'checkbox';
+    minimizeInput.checked = globalMinimizeToTray;
+
+    const minimizeSlider = document.createElement('span');
+    minimizeSlider.className = 'sharkord-toggle-slider';
+
+    minimizeWrapper.appendChild(minimizeInput);
+    minimizeWrapper.appendChild(minimizeSlider);
+
+    let isMinimizeToTray = globalMinimizeToTray;
+    minimizeInput.addEventListener('change', (e) => {
+      isMinimizeToTray = e.target.checked;
+    });
+
+    minimizeContainer.appendChild(minimizeLabel);
+    minimizeContainer.appendChild(minimizeWrapper);
+
     // Container for language
     const langContainer = document.createElement('div');
     langContainer.style.display = 'flex';
@@ -611,6 +663,11 @@ window.addEventListener('DOMContentLoaded', async () => {
             ipcRenderer.send('switch-to-single-mode');
           }
         }
+        
+        if (isMinimizeToTray !== globalMinimizeToTray) {
+          await ipcRenderer.invoke('set-minimize-to-tray', isMinimizeToTray);
+          globalMinimizeToTray = isMinimizeToTray;
+        }
       } catch (err) {
         alert('Erro ao salvar: ' + (err.message || err));
       }
@@ -624,6 +681,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     modal.appendChild(text);
     modal.appendChild(toggleContainer);
     modal.appendChild(tabsContainer);
+    modal.appendChild(minimizeContainer);
     modal.appendChild(langContainer);
     modal.appendChild(actions);
     overlay.appendChild(modal);
@@ -766,6 +824,33 @@ ipcRenderer.on('show-screen-picker', async (event, sources) => {
   header.appendChild(closeBtn);
   modal.appendChild(header);
   
+  // Tabs Container
+  const tabsContainer = document.createElement('div');
+  tabsContainer.style.display = 'flex';
+  tabsContainer.style.borderBottom = '1px solid #1e1f22';
+  tabsContainer.style.padding = '0 24px';
+  tabsContainer.style.gap = '24px';
+  
+  const screensTab = document.createElement('div');
+  screensTab.innerText = langTrans ? (langTrans.tabScreens || 'Telas') : 'Telas';
+  screensTab.style.padding = '16px 0 12px 0';
+  screensTab.style.color = '#f2f3f5';
+  screensTab.style.cursor = 'pointer';
+  screensTab.style.borderBottom = '2px solid #5865F2';
+  screensTab.style.fontWeight = '500';
+  
+  const windowsTab = document.createElement('div');
+  windowsTab.innerText = langTrans ? (langTrans.tabWindows || 'Aplicativos') : 'Aplicativos';
+  windowsTab.style.padding = '16px 0 12px 0';
+  windowsTab.style.color = '#b5bac1';
+  windowsTab.style.cursor = 'pointer';
+  windowsTab.style.borderBottom = '2px solid transparent';
+  windowsTab.style.fontWeight = '500';
+  
+  tabsContainer.appendChild(screensTab);
+  tabsContainer.appendChild(windowsTab);
+  modal.appendChild(tabsContainer);
+
   // Lista (Grid)
   const gridContainer = document.createElement('div');
   gridContainer.style.padding = '24px';
@@ -774,56 +859,141 @@ ipcRenderer.on('show-screen-picker', async (event, sources) => {
   gridContainer.style.gridTemplateColumns = 'repeat(auto-fill, minmax(200px, 1fr))';
   gridContainer.style.gap = '20px';
   
-  sources.forEach(source => {
-    const card = document.createElement('div');
-    card.style.backgroundColor = '#2b2d31';
-    card.style.borderRadius = '8px';
-    card.style.padding = '12px';
-    card.style.cursor = 'pointer';
-    card.style.transition = 'transform 0.2s, background-color 0.2s';
-    card.style.display = 'flex';
-    card.style.flexDirection = 'column';
-    card.style.alignItems = 'center';
+  const renderSources = (filterType) => {
+    gridContainer.innerHTML = '';
+    const filteredSources = sources.filter(s => s.id.startsWith(filterType));
     
-    card.onmouseenter = () => {
-      card.style.backgroundColor = '#3f4147';
-      card.style.transform = 'scale(1.02)';
-    };
-    card.onmouseleave = () => {
+    filteredSources.forEach(source => {
+      const card = document.createElement('div');
       card.style.backgroundColor = '#2b2d31';
-      card.style.transform = 'scale(1)';
-    };
-    
-    card.onclick = () => {
-      ipcRenderer.send('screen-picker-result', source.id);
-      document.body.removeChild(overlay);
-    };
-    
-    const img = document.createElement('img');
-    img.src = source.thumbnailUrl;
-    img.style.width = '100%';
-    img.style.height = '120px';
-    img.style.objectFit = 'contain';
-    img.style.marginBottom = '12px';
-    img.style.borderRadius = '4px';
-    img.style.backgroundColor = '#000';
-    
-    const name = document.createElement('span');
-    name.innerText = source.name;
-    name.style.color = '#dbdee1';
-    name.style.fontSize = '14px';
-    name.style.textAlign = 'center';
-    name.style.whiteSpace = 'nowrap';
-    name.style.overflow = 'hidden';
-    name.style.textOverflow = 'ellipsis';
-    name.style.width = '100%';
-    
-    card.appendChild(img);
-    card.appendChild(name);
-    gridContainer.appendChild(card);
-  });
+      card.style.borderRadius = '8px';
+      card.style.padding = '12px';
+      card.style.cursor = 'pointer';
+      card.style.transition = 'transform 0.2s, background-color 0.2s';
+      card.style.display = 'flex';
+      card.style.flexDirection = 'column';
+      card.style.alignItems = 'center';
+      
+      card.onmouseenter = () => {
+        card.style.backgroundColor = '#3f4147';
+        card.style.transform = 'scale(1.02)';
+      };
+      card.onmouseleave = () => {
+        card.style.backgroundColor = '#2b2d31';
+        card.style.transform = 'scale(1)';
+      };
+      
+      card.onclick = () => {
+        ipcRenderer.send('screen-picker-result', source.id);
+        document.body.removeChild(overlay);
+      };
+      
+      const img = document.createElement('img');
+      img.src = source.thumbnailUrl;
+      img.style.width = '100%';
+      img.style.height = '120px';
+      img.style.objectFit = 'contain';
+      img.style.marginBottom = '12px';
+      img.style.borderRadius = '4px';
+      img.style.backgroundColor = '#000';
+      
+      const name = document.createElement('span');
+      name.innerText = source.name;
+      name.style.color = '#dbdee1';
+      name.style.fontSize = '14px';
+      name.style.textAlign = 'center';
+      name.style.whiteSpace = 'nowrap';
+      name.style.overflow = 'hidden';
+      name.style.textOverflow = 'ellipsis';
+      name.style.width = '100%';
+      
+      card.appendChild(img);
+      card.appendChild(name);
+      gridContainer.appendChild(card);
+    });
+  };
+  
+  screensTab.onclick = () => {
+    screensTab.style.color = '#f2f3f5';
+    screensTab.style.borderBottom = '2px solid #5865F2';
+    windowsTab.style.color = '#b5bac1';
+    windowsTab.style.borderBottom = '2px solid transparent';
+    renderSources('screen:');
+  };
+  
+  windowsTab.onclick = () => {
+    windowsTab.style.color = '#f2f3f5';
+    windowsTab.style.borderBottom = '2px solid #5865F2';
+    screensTab.style.color = '#b5bac1';
+    screensTab.style.borderBottom = '2px solid transparent';
+    renderSources('window:');
+  };
+  
+  // Initial render
+  renderSources('screen:');
   
   modal.appendChild(gridContainer);
   overlay.appendChild(modal);
+  document.body.appendChild(overlay);
+});
+
+ipcRenderer.on('show-close-prompt', async () => {
+  let currentLang = 'pt-BR';
+  try {
+    currentLang = await ipcRenderer.invoke('get-language');
+  } catch(e) {}
+  const t = (key) => (translations[currentLang] && translations[currentLang][key]) ? translations[currentLang][key] : (translations['pt-BR'][key] || key);
+
+  const overlay = document.createElement('div');
+  overlay.className = 'sharkord-modal-overlay';
+  
+  const modal = document.createElement('div');
+  modal.className = 'sharkord-modal-box';
+  
+  const title = document.createElement('h3');
+  title.className = 'sharkord-modal-title';
+  title.innerText = t('modalCloseTitle');
+  
+  const desc = document.createElement('p');
+  desc.className = 'sharkord-modal-text';
+  desc.innerText = t('modalCloseDesc');
+
+  const actions = document.createElement('div');
+  actions.className = 'sharkord-modal-actions';
+  actions.style.flexDirection = 'column';
+  actions.style.gap = '10px';
+
+  const minimizeBtn = document.createElement('button');
+  minimizeBtn.className = 'sharkord-modal-btn';
+  minimizeBtn.style.backgroundColor = '#5865F2';
+  minimizeBtn.style.color = 'white';
+  minimizeBtn.style.width = '100%';
+  minimizeBtn.style.marginBottom = '0';
+  minimizeBtn.innerText = t('btnMinimize');
+  minimizeBtn.onclick = () => {
+    document.body.removeChild(overlay);
+    ipcRenderer.send('close-prompt-response', true);
+  };
+  
+  const quitBtn = document.createElement('button');
+  quitBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
+  quitBtn.style.width = '100%';
+  quitBtn.style.marginBottom = '0';
+  quitBtn.style.backgroundColor = '#fa777c';
+  quitBtn.style.color = 'white';
+  quitBtn.innerText = t('btnQuit');
+  quitBtn.onclick = () => {
+    document.body.removeChild(overlay);
+    ipcRenderer.send('close-prompt-response', false);
+  };
+  
+  actions.appendChild(minimizeBtn);
+  actions.appendChild(quitBtn);
+  
+  modal.appendChild(title);
+  modal.appendChild(desc);
+  modal.appendChild(actions);
+  overlay.appendChild(modal);
+  
   document.body.appendChild(overlay);
 });
