@@ -9,6 +9,8 @@
 
 <br>
 
+*Read this in [English](README.en.md)*
+
 **Aviso Importante:** Este projeto não é uma cópia, um fork (bifurcação) ou um projeto concorrente do Sharkord. Trata-se unicamente de um cliente desktop (wrapper/web app) desenvolvido para facilitar a utilização da interface web original. Este projeto foi feito sem quaisquer fins lucrativos, sendo totalmente código aberto e de livre acesso para a comunidade.
 
 ---
