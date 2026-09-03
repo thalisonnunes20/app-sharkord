@@ -1,4 +1,8 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, Tray, shell, webContents, dialog } = require('electron');
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, Tray, shell, webContents, dialog, Notification, screen } = require('electron');
+
+if (process.platform === 'win32') {
+  app.setAppUserModelId(app.isPackaged ? 'com.sharkord.app' : process.execPath);
+}
 
 const gotTheLock = app.requestSingleInstanceLock();
 if (!gotTheLock) {
@@ -6,7 +10,10 @@ if (!gotTheLock) {
 } else {
   app.on('second-instance', (event, commandLine, workingDirectory) => {
     if (mainWindow) {
+      if (!mainWindow.isVisible()) mainWindow.show();
       if (mainWindow.isMinimized()) mainWindow.restore();
+      mainWindow.setAlwaysOnTop(true);
+      mainWindow.setAlwaysOnTop(false);
       mainWindow.focus();
     }
   });
@@ -298,17 +305,72 @@ app.whenReady().then(async () => {
   createWindow();
 
   // Criação da Bandeja de Sistema
+  let trayMenuWindow = null;
   const iconPath = path.join(__dirname, 'icon.png');
   if (fs.existsSync(iconPath)) {
     tray = new Tray(iconPath);
-    const contextMenu = Menu.buildFromTemplate([
-      { label: 'Abrir Sharkord', click: () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } } },
-      { type: 'separator' },
-      { label: 'Sair', click: () => { forceQuit = true; app.quit(); } }
-    ]);
     tray.setToolTip('Sharkord');
-    tray.setContextMenu(contextMenu);
-    tray.on('click', () => { if (mainWindow) { mainWindow.show(); mainWindow.focus(); } });
+
+    const menuWidth = 180;
+    const menuHeight = 90;
+    
+    trayMenuWindow = new BrowserWindow({
+      width: menuWidth,
+      height: menuHeight,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      resizable: false,
+      show: false,
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+
+    const trayHtml = `
+      <html style="background: transparent;">
+        <body style="margin: 0; padding: 5px; background: transparent; height: 100%; box-sizing: border-box; overflow: hidden; display: flex; flex-direction: column; align-items: center; justify-content: center; user-select: none;">
+          <div style="background-color: #2b2d31; color: #dbdee1; font-family: 'Segoe UI', sans-serif; font-weight: 400; border-radius: 6px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 4px 12px rgba(0,0,0,0.5); width: 100%; height: 100%; display: flex; flex-direction: column; padding: 4px; box-sizing: border-box;">
+            <div onclick="require('electron').ipcRenderer.send('tray-action-open')" style="padding: 8px 12px; font-size: 13px; border-radius: 4px; cursor: pointer; transition: background-color 0.1s, color 0.1s;" onmouseover="this.style.backgroundColor='#5865F2'; this.style.color='#fff'" onmouseout="this.style.backgroundColor='transparent'; this.style.color='#dbdee1'">
+              Abrir Sharkord
+            </div>
+            <div style="height: 1px; background-color: rgba(255,255,255,0.06); margin: 2px 8px;"></div>
+            <div onclick="require('electron').ipcRenderer.send('tray-action-quit')" style="padding: 8px 12px; font-size: 13px; border-radius: 4px; cursor: pointer; color: #fa777c; transition: background-color 0.1s, color 0.1s;" onmouseover="this.style.backgroundColor='#fa777c'; this.style.color='#fff'" onmouseout="this.style.backgroundColor='transparent'; this.style.color='#fa777c'">
+              Sair
+            </div>
+          </div>
+        </body>
+      </html>
+    `;
+    trayMenuWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(trayHtml));
+
+    trayMenuWindow.on('blur', () => {
+      trayMenuWindow.hide();
+    });
+
+    const showCustomMenu = () => {
+      const { x, y } = screen.getCursorScreenPoint();
+      trayMenuWindow.setPosition(x - menuWidth + 10, y - menuHeight);
+      trayMenuWindow.show();
+      trayMenuWindow.focus();
+    };
+
+    tray.on('right-click', showCustomMenu);
+    tray.on('click', () => {
+      if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+    });
+    
+    ipcMain.on('tray-action-open', () => {
+      trayMenuWindow.hide();
+      if (mainWindow) { mainWindow.show(); mainWindow.focus(); }
+    });
+    
+    ipcMain.on('tray-action-quit', () => {
+      forceQuit = true;
+      app.quit();
+    });
   }
 
   app.on('activate', function () {
@@ -364,6 +426,191 @@ ipcMain.handle('get-enable-tabs', () => store.get('enableTabs') || false);
 ipcMain.handle('toggle-enable-tabs', (e, enable) => { store.set('enableTabs', enable); return enable; });
 ipcMain.handle('get-minimize-to-tray', () => store.get('minimizeToTray', false));
 ipcMain.handle('set-minimize-to-tray', (e, val) => { store.set('minimizeToTray', val); return val; });
+ipcMain.handle('get-enable-notifications', () => store.get('enableNotifications', true));
+ipcMain.handle('set-enable-notifications', (e, val) => { store.set('enableNotifications', val); return val; });
+
+ipcMain.on('restore-app', () => {
+  if (mainWindow) {
+    if (!mainWindow.isVisible()) mainWindow.show();
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.setAlwaysOnTop(true);
+    mainWindow.setAlwaysOnTop(false);
+    mainWindow.focus();
+  }
+});
+
+let notificationWindow = null;
+let currentNotifId = null;
+let hideTimeout = null;
+
+ipcMain.on('custom-notification-clicked', () => {
+  if (mainWindow) {
+    if (!mainWindow.isVisible()) mainWindow.show();
+    if (mainWindow.isMinimized()) mainWindow.restore();
+    mainWindow.setAlwaysOnTop(true);
+    mainWindow.setAlwaysOnTop(false);
+    mainWindow.focus();
+    
+    if (currentNotifId) {
+      mainWindow.webContents.send('notification-clicked', currentNotifId);
+    }
+  }
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.hide();
+  }
+});
+
+ipcMain.on('dismiss-notification', () => {
+  if (notificationWindow && !notificationWindow.isDestroyed()) {
+    notificationWindow.hide();
+  }
+});
+
+ipcMain.on('show-notification', (event, { title, body, notifId }) => {
+  currentNotifId = notifId;
+  const { width, height } = screen.getPrimaryDisplay().workAreaSize;
+  const notifWidth = 320;
+  const notifHeight = 85;
+
+  if (!notificationWindow || notificationWindow.isDestroyed()) {
+    notificationWindow = new BrowserWindow({
+      width: notifWidth,
+      height: notifHeight,
+      x: width - notifWidth - 20,
+      y: height - notifHeight - 20,
+      frame: false,
+      transparent: true,
+      alwaysOnTop: true,
+      skipTaskbar: true,
+      focusable: false,
+      resizable: false,
+      icon: path.join(__dirname, 'icon.png'),
+      webPreferences: {
+        nodeIntegration: true,
+        contextIsolation: false
+      }
+    });
+
+    const htmlContent = `
+      <html style="background: transparent;">
+        <body style="margin:0; padding:10px; background: transparent; height: 100%; box-sizing: border-box; overflow: hidden; display: flex; justify-content: center; align-items: center; user-select: none;">
+          <div id="wrapper" style="position: relative; left: 0px; background-color: #2b2d31; color: #f2f3f5; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; border-radius: 12px; border: 1px solid rgba(255,255,255,0.05); box-shadow: 0 8px 16px rgba(0,0,0,0.6); width: 100%; height: 100%; display: flex; flex-direction: column; justify-content: center; padding: 0 15px; box-sizing: border-box; transition: background-color 0.2s, left 0.1s; cursor: grab;" onmouseover="this.style.backgroundColor='#313338'" onmouseout="this.style.backgroundColor='#2b2d31'">
+            <strong id="n-title" style="font-size: 14px; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; margin-bottom: 4px; pointer-events: none;">Sharkord</strong>
+            <div id="n-body" style="font-size: 13px; color: #b5bac1; white-space: nowrap; text-overflow: ellipsis; overflow: hidden; pointer-events: none;">Nova mensagem</div>
+          </div>
+          <script>
+            const { ipcRenderer } = require('electron');
+            const wrapper = document.getElementById('wrapper');
+            let isDragging = false;
+            let startX = 0;
+            let currentLeft = 0;
+
+            window.playNotifSound = () => {
+              try {
+                const ctx = new (window.AudioContext || window.webkitAudioContext)();
+                const playOsc = (freq, startTime) => {
+                  const osc = ctx.createOscillator();
+                  const gain = ctx.createGain();
+                  osc.type = 'sine';
+                  osc.frequency.setValueAtTime(freq, startTime);
+                  osc.connect(gain);
+                  gain.connect(ctx.destination);
+                  osc.start(startTime);
+                  gain.gain.setValueAtTime(0, startTime);
+                  gain.gain.linearRampToValueAtTime(0.3, startTime + 0.01);
+                  gain.gain.exponentialRampToValueAtTime(0.001, startTime + 0.4);
+                  osc.stop(startTime + 0.4);
+                };
+                playOsc(659.25, ctx.currentTime);
+                playOsc(880.00, ctx.currentTime + 0.12);
+              } catch(e) {}
+            };
+
+            window.updateContent = (t, b) => {
+              document.getElementById('n-title').innerText = t;
+              document.getElementById('n-body').innerText = b;
+              wrapper.style.transition = 'background-color 0.2s, left 0.2s';
+              wrapper.style.left = '0px';
+              wrapper.style.opacity = '1';
+              window.playNotifSound();
+            };
+
+            document.body.addEventListener('mousedown', (e) => {
+              isDragging = true;
+              startX = e.clientX;
+              wrapper.style.transition = 'none';
+              wrapper.style.cursor = 'grabbing';
+            });
+
+            document.body.addEventListener('mousemove', (e) => {
+              if (!isDragging) return;
+              currentLeft = e.clientX - startX;
+              if (currentLeft > 0) {
+                wrapper.style.left = currentLeft + 'px';
+                wrapper.style.opacity = Math.max(0, 1 - (currentLeft / 200));
+              }
+            });
+
+            document.body.addEventListener('mouseup', (e) => {
+              if (!isDragging) return;
+              isDragging = false;
+              wrapper.style.cursor = 'grab';
+              if (currentLeft > 100) {
+                wrapper.style.transition = 'left 0.2s, opacity 0.2s';
+                wrapper.style.left = '320px';
+                wrapper.style.opacity = '0';
+                setTimeout(() => ipcRenderer.send('dismiss-notification'), 200);
+              } else if (currentLeft < 5) {
+                ipcRenderer.send('custom-notification-clicked');
+                wrapper.style.transition = 'left 0.2s';
+                wrapper.style.left = '0px';
+              } else {
+                wrapper.style.transition = 'left 0.2s, opacity 0.2s';
+                wrapper.style.left = '0px';
+                wrapper.style.opacity = '1';
+              }
+              currentLeft = 0;
+            });
+            
+            document.body.addEventListener('mouseleave', () => {
+               if (isDragging) {
+                  isDragging = false;
+                  wrapper.style.transition = 'left 0.2s, opacity 0.2s';
+                  wrapper.style.left = '0px';
+                  wrapper.style.opacity = '1';
+                  wrapper.style.cursor = 'grab';
+                  currentLeft = 0;
+               }
+            });
+          </script>
+        </body>
+      </html>
+    `;
+    notificationWindow.loadURL('data:text/html;charset=utf-8,' + encodeURIComponent(htmlContent));
+    
+    notificationWindow.webContents.once('did-finish-load', () => {
+      const safeTitle = (title || 'Sharkord').replace(/"/g, '\\"');
+      const safeBody = (body || 'Nova mensagem').replace(/"/g, '\\"');
+      notificationWindow.webContents.executeJavaScript(`window.updateContent("${safeTitle}", "${safeBody}");`);
+      notificationWindow.showInactive();
+    });
+  } else {
+    const safeTitle = (title || 'Sharkord').replace(/"/g, '\\"');
+    const safeBody = (body || 'Nova mensagem').replace(/"/g, '\\"');
+    notificationWindow.webContents.executeJavaScript(`window.updateContent("${safeTitle}", "${safeBody}");`);
+    if (!notificationWindow.isVisible()) {
+      notificationWindow.showInactive();
+    }
+  }
+
+  if (hideTimeout) clearTimeout(hideTimeout);
+  hideTimeout = setTimeout(() => {
+    if (notificationWindow && !notificationWindow.isDestroyed()) {
+      notificationWindow.hide();
+    }
+  }, 6000);
+});
+
 ipcMain.on('switch-to-tabs-mode', () => {
   if (mainWindow) mainWindow.webContents.send('toggle-tab-bar', true);
 });

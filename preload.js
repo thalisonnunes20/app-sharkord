@@ -1,4 +1,86 @@
-const { contextBridge, ipcRenderer } = require('electron');
+const { contextBridge, ipcRenderer, webFrame } = require('electron');
+
+let globalAutoStart = false;
+let globalTabsEnabled = false;
+let globalMinimizeToTray = false;
+let globalEnableNotifications = true;
+
+contextBridge.exposeInMainWorld('sharkordDesktopApp', {
+  isNotificationsEnabled: () => globalEnableNotifications,
+  sendNotificationClick: () => {
+    ipcRenderer.send('restore-app');
+  },
+  sendNotification: (title, options, notifId) => {
+    ipcRenderer.send('show-notification', { title, body: options?.body, notifId });
+  }
+});
+
+ipcRenderer.on('notification-clicked', (e, notifId) => {
+  window.dispatchEvent(new CustomEvent('app-notify-click-' + notifId));
+});
+
+// Intercepta a Notification nativa e controla se ela pode ou não ser instanciada baseada nas configs do app
+webFrame.executeJavaScript(`
+  const OriginalNotification = window.Notification;
+  window.Notification = function(title, options) {
+    if (window.sharkordDesktopApp && window.sharkordDesktopApp.isNotificationsEnabled()) {
+      const notifId = Date.now().toString() + Math.random().toString();
+      window.sharkordDesktopApp.sendNotification(title, options, notifId);
+      
+      const fakeNotif = { close: () => {}, onclick: null, addEventListener: () => {}, removeEventListener: () => {} };
+      
+      window.addEventListener('app-notify-click-' + notifId, () => {
+        if (typeof fakeNotif.onclick === 'function') fakeNotif.onclick();
+      });
+      
+      return fakeNotif;
+    }
+    return { close: () => {}, onclick: null, addEventListener: () => {}, removeEventListener: () => {} };
+  };
+  window.Notification.permission = 'granted';
+  window.Notification.requestPermission = function(cb) {
+    if (cb) cb('granted');
+    return Promise.resolve('granted');
+  };
+
+  // Intercepta Notificações disparadas por Service Workers (Push API)
+  const applyRegistrationHook = (reg) => {
+    if (!reg) return reg;
+    const OriginalShowNotification = reg.showNotification;
+    if (OriginalShowNotification && !reg._hookedBySharkord) {
+      reg.showNotification = function(title, options) {
+        if (window.sharkordDesktopApp && window.sharkordDesktopApp.isNotificationsEnabled()) {
+          const notifId = Date.now().toString() + Math.random().toString();
+          window.sharkordDesktopApp.sendNotification(title, options, notifId);
+        }
+        return Promise.resolve();
+      };
+      reg._hookedBySharkord = true;
+    }
+    return reg;
+  };
+
+  if (navigator && navigator.serviceWorker) {
+    const originalReady = Object.getOwnPropertyDescriptor(navigator.serviceWorker.constructor.prototype, 'ready');
+    if (originalReady && originalReady.get) {
+      Object.defineProperty(navigator.serviceWorker.constructor.prototype, 'ready', {
+        get: function() {
+          return originalReady.get.call(this).then(reg => applyRegistrationHook(reg));
+        }
+      });
+    }
+    
+    const originalGetRegistration = navigator.serviceWorker.getRegistration;
+    navigator.serviceWorker.getRegistration = function(...args) {
+      return originalGetRegistration.apply(this, args).then(reg => applyRegistrationHook(reg));
+    };
+    
+    const originalRegister = navigator.serviceWorker.register;
+    navigator.serviceWorker.register = function(...args) {
+      return originalRegister.apply(this, args).then(reg => applyRegistrationHook(reg));
+    };
+  }
+`);
 
 contextBridge.exposeInMainWorld('electronAPI', {
   saveServerUrl: (url) => ipcRenderer.send('save-server-url', url),
@@ -57,6 +139,7 @@ const translations = {
     modalSettingsDesc: 'Gerencie as configurações do Sharkord no seu sistema.',
     settingAutoStart: 'Iniciar com o Windows',
     settingMinimizeToTray: 'Continuar em segundo plano (Bandeja)',
+    settingNotifications: 'Notificações (Desktop)',
     settingLanguage: 'Idioma / Language',
     modalCloseTitle: 'Deseja continuar recebendo notificações?',
     modalCloseDesc: 'Você pode alterar essa preferência a qualquer momento nas configurações do aplicativo.',
@@ -110,6 +193,7 @@ const translations = {
     modalSettingsDesc: 'Manage your Sharkord settings on your system.',
     settingAutoStart: 'Start with Windows',
     settingMinimizeToTray: 'Run in background (System Tray)',
+    settingNotifications: 'Notifications (Desktop)',
     settingLanguage: 'Language / Idioma',
     modalCloseTitle: 'Do you want to continue receiving notifications?',
     modalCloseDesc: 'You can change this preference at any time in the app settings.',
@@ -429,15 +513,14 @@ window.addEventListener('DOMContentLoaded', async () => {
   }).catch(() => {});
 
 
-  let globalAutoStart = localStorage.getItem('sharkord_autostart') === 'true';
-  let globalTabsEnabled = false;
-  let globalMinimizeToTray = false;
+  globalAutoStart = localStorage.getItem('sharkord_autostart') === 'true';
 
   // Pré-carrega no fundo para não travar quando clicar na engrenagem
   try {
     ipcRenderer.invoke('get-auto-start').then(res => { if(res !== undefined && res !== null) globalAutoStart = res; }).catch(()=>{});
     ipcRenderer.invoke('get-enable-tabs').then(res => { globalTabsEnabled = res; }).catch(()=>{});
     ipcRenderer.invoke('get-minimize-to-tray').then(res => { if(res !== undefined && res !== null) globalMinimizeToTray = res; }).catch(()=>{});
+    ipcRenderer.invoke('get-enable-notifications').then(res => { if(res !== undefined && res !== null) globalEnableNotifications = res; }).catch(()=>{});
   } catch(err) {}
 
   // Criação do botão de configurações
@@ -573,6 +656,42 @@ window.addEventListener('DOMContentLoaded', async () => {
     minimizeContainer.appendChild(minimizeLabel);
     minimizeContainer.appendChild(minimizeWrapper);
 
+    // Container for Notifications
+    const notifContainer = document.createElement('div');
+    notifContainer.style.display = 'flex';
+    notifContainer.style.justifyContent = 'space-between';
+    notifContainer.style.alignItems = 'center';
+    notifContainer.style.marginBottom = '12px';
+    notifContainer.style.padding = '12px';
+    notifContainer.style.backgroundColor = '#1e1f22';
+    notifContainer.style.borderRadius = '8px';
+
+    const notifLabel = document.createElement('span');
+    notifLabel.innerText = t('settingNotifications') || 'Habilitar Notificações do App';
+    notifLabel.style.color = '#dbdee1';
+    notifLabel.style.fontWeight = '500';
+
+    const notifWrapper = document.createElement('label');
+    notifWrapper.className = 'sharkord-toggle-switch';
+
+    const notifInput = document.createElement('input');
+    notifInput.type = 'checkbox';
+    notifInput.checked = globalEnableNotifications;
+
+    const notifSlider = document.createElement('span');
+    notifSlider.className = 'sharkord-toggle-slider';
+
+    notifWrapper.appendChild(notifInput);
+    notifWrapper.appendChild(notifSlider);
+
+    let isEnableNotifications = globalEnableNotifications;
+    notifInput.addEventListener('change', (e) => {
+      isEnableNotifications = e.target.checked;
+    });
+
+    notifContainer.appendChild(notifLabel);
+    notifContainer.appendChild(notifWrapper);
+
     // Container for language
     const langContainer = document.createElement('div');
     langContainer.style.display = 'flex';
@@ -668,6 +787,11 @@ window.addEventListener('DOMContentLoaded', async () => {
           await ipcRenderer.invoke('set-minimize-to-tray', isMinimizeToTray);
           globalMinimizeToTray = isMinimizeToTray;
         }
+
+        if (isEnableNotifications !== globalEnableNotifications) {
+          await ipcRenderer.invoke('set-enable-notifications', isEnableNotifications);
+          globalEnableNotifications = isEnableNotifications;
+        }
       } catch (err) {
         alert('Erro ao salvar: ' + (err.message || err));
       }
@@ -682,6 +806,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     modal.appendChild(toggleContainer);
     modal.appendChild(tabsContainer);
     modal.appendChild(minimizeContainer);
+    modal.appendChild(notifContainer);
     modal.appendChild(langContainer);
     modal.appendChild(actions);
     overlay.appendChild(modal);
@@ -979,7 +1104,7 @@ ipcRenderer.on('show-close-prompt', async () => {
   quitBtn.className = 'sharkord-modal-btn sharkord-modal-btn-cancel';
   quitBtn.style.width = '100%';
   quitBtn.style.marginBottom = '0';
-  quitBtn.style.backgroundColor = '#fa777c';
+  quitBtn.style.backgroundColor = '#da373c';
   quitBtn.style.color = 'white';
   quitBtn.innerText = t('btnQuit');
   quitBtn.onclick = () => {
