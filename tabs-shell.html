@@ -83,7 +83,6 @@
       border: none;
     }
     webview.tab-hidden {
-      visibility: hidden;
       z-index: -1;
       position: absolute;
       top: -9999px;
@@ -193,6 +192,7 @@
       wv.id = 'webview-' + id;
       wv.dataset.id = id;
       wv.preload = formatFileUrl(preloadPath);
+      wv.partition = 'persist:sharkord';
       wv.className = 'tab-hidden';
       
       const tabObj = { id, tabEl, wv, url };

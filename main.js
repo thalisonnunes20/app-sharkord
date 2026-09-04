@@ -172,7 +172,8 @@ function createWindow() {
       preload: path.join(__dirname, 'preload.js'),
       nodeIntegration: false,
       contextIsolation: true,
-      webviewTag: true
+      webviewTag: true,
+      backgroundThrottling: false
     },
     autoHideMenuBar: true,
     show: false // Don't show until ready-to-show
@@ -284,6 +285,9 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
+  // Configura um User-Agent de navegador padrão para evitar bloqueio de CDNs (ex: avatares e banners)
+  app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
   const StoreModule = await import('electron-store');
   const Store = StoreModule.default || StoreModule;
   store = new Store();
