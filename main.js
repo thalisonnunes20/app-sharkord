@@ -52,8 +52,30 @@ function compareVersions(v1, v2) {
   return 0;
 }
 
-function checkCustomGitHubUpdate() {
+function checkCustomGitHubUpdate(isManual = false) {
   broadcast('update-status', 'Buscando...');
+  
+  const customUrl = store.get('customUpdateUrl');
+
+  if (customUrl) {
+    const isHttps = customUrl.startsWith('https://');
+    const client = isHttps ? https : require('http');
+    
+    const req = client.get(customUrl, { headers: { 'User-Agent': 'Sharkord-App-Updater' } }, (res) => {
+      if (res.statusCode === 301 || res.statusCode === 302) {
+        const nextUrl = res.headers.location;
+        const nextClient = nextUrl.startsWith('https://') ? https : require('http');
+        nextClient.get(nextUrl, { headers: { 'User-Agent': 'Sharkord-App-Updater' } }, parseReleaseResponse);
+        return;
+      }
+      parseReleaseResponse(res);
+    });
+
+    req.on('error', (err) => {
+      broadcast('update-status', 'Erro: ' + (err.message || err));
+    });
+    return;
+  }
   
   const options = {
     hostname: 'api.github.com',
@@ -80,11 +102,11 @@ function parseReleaseResponse(res) {
   res.on('end', () => {
     try {
       if (res.statusCode !== 200) {
-        broadcast('update-status', 'Erro no GitHub: HTTP ' + res.statusCode);
+        broadcast('update-status', 'Erro no servidor: HTTP ' + res.statusCode);
         return;
       }
       const release = JSON.parse(data);
-      const latestVersion = release.tag_name || release.name || '';
+      const latestVersion = release.tag_name ? release.tag_name.replace('v', '') : (release.name ? release.name.replace('v', '') : '');
       const currentVersion = app.getVersion();
 
       if (compareVersions(latestVersion, currentVersion) > 0) {
@@ -110,7 +132,10 @@ function downloadUpdateFile(fileUrl, fileName) {
   downloadedExePath = tempPath;
 
   const downloadRequest = (url) => {
-    https.get(url, { headers: { 'User-Agent': 'Sharkord-App-Updater' } }, (res) => {
+    const isHttps = url.startsWith('https://');
+    const client = isHttps ? https : require('http');
+    
+    client.get(url, { headers: { 'User-Agent': 'Sharkord-App-Updater' } }, (res) => {
       if (res.statusCode === 301 || res.statusCode === 302) {
         downloadRequest(res.headers.location);
         return;
@@ -156,7 +181,7 @@ ipcMain.on('install-update', () => {
 });
 
 ipcMain.on('manual-check-update', () => {
-  checkCustomGitHubUpdate();
+  checkCustomGitHubUpdate(true);
 });
 
 ipcMain.handle('is-update-ready', () => {
@@ -437,6 +462,8 @@ ipcMain.handle('get-minimize-to-tray', () => store.get('minimizeToTray', false))
 ipcMain.handle('set-minimize-to-tray', (e, val) => { store.set('minimizeToTray', val); return val; });
 ipcMain.handle('get-enable-notifications', () => store.get('enableNotifications', true));
 ipcMain.handle('set-enable-notifications', (e, val) => { store.set('enableNotifications', val); return val; });
+ipcMain.handle('get-custom-update-url', () => store.get('customUpdateUrl') || '');
+ipcMain.handle('save-custom-update-url', (e, val) => { store.set('customUpdateUrl', val); return val; });
 
 ipcMain.on('restore-app', () => {
   if (mainWindow) {

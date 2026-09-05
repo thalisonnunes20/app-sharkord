@@ -143,6 +143,8 @@ const translations = {
     settingLanguage: 'Idioma / Language',
     modalCloseTitle: 'Deseja continuar recebendo notificações?',
     modalCloseDesc: 'Você pode alterar essa preferência a qualquer momento nas configurações do aplicativo.',
+    settingCustomUpdateUrl: 'Link de Atualização (Opcional)',
+    settingCustomUpdateUrlPlaceholder: 'https://sua-api.com/api/releases/latest',
     btnMinimize: 'Continuar em Segundo Plano',
     btnQuit: 'Fechar Completamente',
     btnCancel: 'Cancelar',
@@ -213,6 +215,8 @@ const translations = {
     btnConnect: 'Connect',
     screenPickerTitle: 'Choose what to share',
     settingTabs: 'Enable Tabs',
+    settingCustomUpdateUrl: 'Custom Update Link (Optional)',
+    settingCustomUpdateUrlPlaceholder: 'https://your-api.com/api/releases/latest',
     modalRestartTitle: 'Restart Required',
     modalRestartDesc: 'The application will be restarted to apply this setting.'
   }
@@ -740,6 +744,40 @@ window.addEventListener('DOMContentLoaded', async () => {
     langContainer.appendChild(langLabel);
     langContainer.appendChild(langOptions);
 
+    // Container for Custom Update URL
+    const updateUrlContainer = document.createElement('div');
+    updateUrlContainer.style.display = 'flex';
+    updateUrlContainer.style.flexDirection = 'column';
+    updateUrlContainer.style.gap = '8px';
+    updateUrlContainer.style.marginBottom = '24px';
+    updateUrlContainer.style.padding = '12px';
+    updateUrlContainer.style.backgroundColor = '#1e1f22';
+    updateUrlContainer.style.borderRadius = '8px';
+
+    const updateUrlLabel = document.createElement('span');
+    updateUrlLabel.innerText = t('settingCustomUpdateUrl') || 'Link de Atualização Personalizado';
+    updateUrlLabel.style.color = '#dbdee1';
+    updateUrlLabel.style.fontWeight = '500';
+
+    const updateUrlInput = document.createElement('input');
+    updateUrlInput.type = 'text';
+    updateUrlInput.placeholder = t('settingCustomUpdateUrlPlaceholder') || 'https://sua-api.com/api/releases/latest';
+    updateUrlInput.style.backgroundColor = '#2b2d31';
+    updateUrlInput.style.color = '#dbdee1';
+    updateUrlInput.style.border = '1px solid #1e1f22';
+    updateUrlInput.style.padding = '10px';
+    updateUrlInput.style.borderRadius = '4px';
+    updateUrlInput.style.outline = 'none';
+    updateUrlInput.style.width = '100%';
+    
+    // Fetch current custom URL
+    ipcRenderer.invoke('get-custom-update-url').then(val => {
+      if (val) updateUrlInput.value = val;
+    }).catch(()=>{});
+
+    updateUrlContainer.appendChild(updateUrlLabel);
+    updateUrlContainer.appendChild(updateUrlInput);
+
     const actions = document.createElement('div');
     actions.className = 'sharkord-modal-actions';
     
@@ -792,6 +830,8 @@ window.addEventListener('DOMContentLoaded', async () => {
           await ipcRenderer.invoke('set-enable-notifications', isEnableNotifications);
           globalEnableNotifications = isEnableNotifications;
         }
+
+        await ipcRenderer.invoke('save-custom-update-url', updateUrlInput.value.trim());
       } catch (err) {
         alert('Erro ao salvar: ' + (err.message || err));
       }
@@ -808,6 +848,7 @@ window.addEventListener('DOMContentLoaded', async () => {
     modal.appendChild(minimizeContainer);
     modal.appendChild(notifContainer);
     modal.appendChild(langContainer);
+    modal.appendChild(updateUrlContainer);
     modal.appendChild(actions);
     overlay.appendChild(modal);
     
