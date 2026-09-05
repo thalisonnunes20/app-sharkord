@@ -219,51 +219,56 @@ function createWindow() {
     }
   });
 
-  // Handle WebRTC Permissions for Sharkord (Camera, Microphone, Screen Sharing)
-  session.defaultSession.setPermissionRequestHandler((webContents, permission, callback) => {
-    callback(true);
-  });
-
-  session.defaultSession.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
-    return true;
-  });
-
-  session.defaultSession.setDevicePermissionHandler((details) => {
-    return true;
-  });
-
-  // Handle Screen Sharing Picker
-  let screenPickerCallback = null;
-
-  session.defaultSession.setDisplayMediaRequestHandler((request, callback) => {
-    desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 200, height: 200 } }).then((sources) => {
-      screenPickerCallback = callback;
-      
-      const sourcesData = sources.map(source => ({
-        id: source.id,
-        name: source.name,
-        thumbnailUrl: source.thumbnail.toDataURL()
-      }));
-
-      if (mainWindow) mainWindow.webContents.send('show-screen-picker', sourcesData);
-
-      ipcMain.removeAllListeners('screen-picker-result');
-      ipcMain.once('screen-picker-result', (event, sourceId) => {
-        if (screenPickerCallback) {
-          if (sourceId) {
-            const selectedSource = sources.find(s => s.id === sourceId);
-            screenPickerCallback({ video: selectedSource || { id: sourceId, name: 'Screen' }, audio: 'loopback' });
-          } else {
-            screenPickerCallback(); // Cancelado
-          }
-          screenPickerCallback = null;
-        }
-      });
-    }).catch(err => {
-      console.error('Erro ao obter telas:', err);
-      callback();
+  // Helper para configurar permissões de WebRTC e tela para uma sessão
+  const configureSession = (sess) => {
+    sess.setPermissionRequestHandler((webContents, permission, callback) => {
+      callback(true);
     });
-  });
+
+    sess.setPermissionCheckHandler((webContents, permission, requestingOrigin, details) => {
+      return true;
+    });
+
+    sess.setDevicePermissionHandler((details) => {
+      return true;
+    });
+
+    // Handle Screen Sharing Picker
+    let screenPickerCallback = null;
+
+    sess.setDisplayMediaRequestHandler((request, callback) => {
+      desktopCapturer.getSources({ types: ['screen', 'window'], thumbnailSize: { width: 200, height: 200 } }).then((sources) => {
+        screenPickerCallback = callback;
+        
+        const sourcesData = sources.map(source => ({
+          id: source.id,
+          name: source.name,
+          thumbnailUrl: source.thumbnail.toDataURL()
+        }));
+
+        if (mainWindow) mainWindow.webContents.send('show-screen-picker', sourcesData);
+
+        ipcMain.removeAllListeners('screen-picker-result');
+        ipcMain.once('screen-picker-result', (event, sourceId) => {
+          if (screenPickerCallback) {
+            if (sourceId) {
+              const selectedSource = sources.find(s => s.id === sourceId);
+              screenPickerCallback({ video: selectedSource || { id: sourceId, name: 'Screen' }, audio: 'loopback' });
+            } else {
+              screenPickerCallback(); // Cancelado
+            }
+            screenPickerCallback = null;
+          }
+        });
+      }).catch(err => {
+        console.error('Erro ao obter telas:', err);
+        callback();
+      });
+    });
+  };
+
+  configureSession(session.defaultSession);
+  configureSession(session.fromPartition('persist:sharkord'));
 
   mainWindow.loadFile('tabs-shell.html');
 
