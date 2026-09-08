@@ -1,4 +1,4 @@
-const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, Tray, shell, webContents, dialog, Notification, screen } = require('electron');
+const { app, BrowserWindow, ipcMain, session, desktopCapturer, Menu, Tray, shell, webContents, dialog, Notification, screen, powerMonitor } = require('electron');
 
 if (process.platform === 'win32') {
   app.setAppUserModelId(app.isPackaged ? 'com.sharkord.app' : process.execPath);
@@ -35,9 +35,9 @@ let tray = null;
 let forceQuit = false;
 let downloadedExePath = null;
 
-// Fix para lentidão da câmera no Windows
-app.commandLine.appendSwitch('disable-features', 'MediaFoundationVideoCapture');
-
+// Fix para lentidão da câmera no Windows e problemas de carregamento de imagens no background
+app.commandLine.appendSwitch('disable-features', 'MediaFoundationVideoCapture,OutOfBlinkCors');
+app.commandLine.appendSwitch('disable-renderer-backgrounding');
 function compareVersions(v1, v2) {
   const cleanV1 = (v1 || '').replace(/^v/, '').trim();
   const cleanV2 = (v2 || '').replace(/^v/, '').trim();
@@ -128,7 +128,9 @@ function parseReleaseResponse(res) {
 function downloadUpdateFile(fileUrl, fileName) {
   broadcast('update-status', 'Baixando');
   
-  const tempPath = path.join(app.getPath('temp'), fileName);
+  // Adiciona um timestamp para evitar o erro EBUSY (arquivo em uso ou bloqueado)
+  const safeFileName = fileName.replace('.exe', `-${Date.now()}.exe`);
+  const tempPath = path.join(app.getPath('temp'), safeFileName);
   downloadedExePath = tempPath;
 
   const downloadRequest = (url) => {
@@ -148,11 +150,22 @@ function downloadUpdateFile(fileUrl, fileName) {
 
       const totalBytes = parseInt(res.headers['content-length'] || '0', 10);
       let downloadedBytes = 0;
-      const fileStream = fs.createWriteStream(tempPath);
+      let fileStream;
+      
+      try {
+        fileStream = fs.createWriteStream(tempPath);
+      } catch (err) {
+        broadcast('update-status', 'Erro ao criar arquivo: ' + err.message);
+        return;
+      }
+
+      fileStream.on('error', (err) => {
+        broadcast('update-status', 'Erro ao salvar arquivo: ' + err.message);
+      });
 
       res.on('data', (chunk) => {
         downloadedBytes += chunk.length;
-        fileStream.write(chunk);
+        if (fileStream) fileStream.write(chunk);
         if (totalBytes > 0) {
           const percent = Math.round((downloadedBytes / totalBytes) * 100);
           broadcast('update-status', `Baixando: ${percent}%`);
@@ -317,6 +330,27 @@ function createWindow() {
 app.whenReady().then(async () => {
   // Configura um User-Agent de navegador padrão para evitar bloqueio de CDNs (ex: avatares e banners)
   app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
+
+  // Limpeza de cache preventiva (corrige bug das imagens/avatares após muito tempo aberto ou retorno de suspensão)
+  const clearAppCache = async () => {
+    try {
+      if (session.defaultSession) await session.defaultSession.clearCache();
+      const persistSession = session.fromPartition('persist:sharkord');
+      if (persistSession) await persistSession.clearCache();
+      console.log('Cache limpo para evitar bugs de imagem.');
+    } catch (err) {
+      console.error('Erro ao limpar cache:', err);
+    }
+  };
+
+  // Limpa o cache na inicialização e a cada 1 hora
+  clearAppCache();
+  setInterval(clearAppCache, 1000 * 60 * 60);
+
+  // Limpa o cache quando o PC volta da suspensão (momento crítico onde o cache de rede costuma corromper)
+  powerMonitor.on('resume', () => {
+    setTimeout(clearAppCache, 2000);
+  });
 
   const StoreModule = await import('electron-store');
   const Store = StoreModule.default || StoreModule;
