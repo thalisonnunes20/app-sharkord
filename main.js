@@ -328,29 +328,10 @@ function createWindow() {
 }
 
 app.whenReady().then(async () => {
-  // Configura um User-Agent de navegador padrão para evitar bloqueio de CDNs (ex: avatares e banners)
-  app.userAgentFallback = 'Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/120.0.0.0 Safari/537.36';
-
-  // Limpeza de cache preventiva (corrige bug das imagens/avatares após muito tempo aberto ou retorno de suspensão)
-  const clearAppCache = async () => {
-    try {
-      if (session.defaultSession) await session.defaultSession.clearCache();
-      const persistSession = session.fromPartition('persist:sharkord');
-      if (persistSession) await persistSession.clearCache();
-      console.log('Cache limpo para evitar bugs de imagem.');
-    } catch (err) {
-      console.error('Erro ao limpar cache:', err);
-    }
-  };
-
-  // Limpa o cache na inicialização e a cada 1 hora
-  clearAppCache();
-  setInterval(clearAppCache, 1000 * 60 * 60);
-
-  // Limpa o cache quando o PC volta da suspensão (momento crítico onde o cache de rede costuma corromper)
-  powerMonitor.on('resume', () => {
-    setTimeout(clearAppCache, 2000);
-  });
+  // Configura um User-Agent de navegador padrão dinâmico com a versão correta do Chrome
+  // Isso evita que CDNs (como Cloudflare) bloqueiem o carregamento de imagens por fingerprinting
+  const chromeVersion = process.versions.chrome;
+  app.userAgentFallback = `Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/${chromeVersion} Safari/537.36`;
 
   const StoreModule = await import('electron-store');
   const Store = StoreModule.default || StoreModule;
