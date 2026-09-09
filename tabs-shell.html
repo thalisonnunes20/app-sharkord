@@ -245,7 +245,7 @@
       saveTabs();
       
       if (tabs.length === 0) {
-        window.close();
+        createTab(formatFileUrl(indexPath));
       } else if (tab.tabEl.classList.contains('active')) {
         const newActive = tabs[Math.max(0, idx - 1)];
         activateTab(newActive.id);
